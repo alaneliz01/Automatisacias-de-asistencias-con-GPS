@@ -1,0 +1,93 @@
+﻿<Window x:Class="Secorvi.Login"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SECORVI - Acceso" Height="500" Width="400"
+        Background="Transparent" WindowStartupLocation="CenterScreen"
+        WindowStyle="None" AllowsTransparency="True">
+
+    <Window.Resources>
+        <Style x:Key="ModernEntryStyle" TargetType="Control">
+            <Setter Property="Background" Value="#12161D"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#2D323E"/>
+            <Setter Property="BorderThickness" Value="0,0,0,2"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="FontSize" Value="15"/>
+        </Style>
+
+        <Style x:Key="LoginButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#48E034"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontWeight" Value="Black"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#3BC92A"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Border BorderBrush="#2D323E" BorderThickness="1" CornerRadius="15" Background="#0B0D12">
+        <Grid Margin="40">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Margin="0,0,0,40" HorizontalAlignment="Center">
+                <TextBlock Text="SECORVI" Foreground="#FFB300" FontSize="50" FontWeight="Black" HorizontalAlignment="Center">
+                    <TextBlock.Effect>
+                        <DropShadowEffect BlurRadius="10" Color="#FFB300" Opacity="0.3" ShadowDepth="0"/>
+                    </TextBlock.Effect>
+                </TextBlock>
+                <TextBlock Text="OPERATIONS CONTROL CENTER" Foreground="#4B5563" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Margin="0,0,0,25">
+                <TextBlock Text="USER IDENTIFICATION" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
+                <TextBox x:Name="txtUser" Style="{StaticResource ModernEntryStyle}" CaretBrush="#FFB300"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Margin="0,0,0,35">
+                <TextBlock Text="SECURITY KEY" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
+                <PasswordBox x:Name="txtPass" Style="{StaticResource ModernEntryStyle}" Foreground="White" CaretBrush="#FFB300"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="3">
+                <Border x:Name="brdStatus" Height="30" CornerRadius="2" Margin="0,0,0,15" Visibility="Collapsed" Background="#3D1B1E">
+                    <TextBlock x:Name="txtStatusMsg" Text="INVALID ACCESS" VerticalAlignment="Center" HorizontalAlignment="Center" 
+                               FontWeight="Bold" FontSize="10" Foreground="#FF5252"/>
+                </Border>
+
+                <Button Content="ACCESS SYSTEM" Style="{StaticResource LoginButtonStyle}"
+                        Height="50" Click="BtnLogin_Click" Margin="0,0,0,15"/>
+
+                <Button Content="TERMINATE SESSION" Background="Transparent" Foreground="#4B5563" FontSize="10" FontWeight="Bold"
+                        BorderThickness="0" Click="BtnSalir_Click" Cursor="Hand" HorizontalAlignment="Center">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Foreground" Value="#FF5252"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
