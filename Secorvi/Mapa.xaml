@@ -1,12 +1,15 @@
-﻿<Page x:Class="Secorvi.Mapa"
-      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
-      Title="Radar"
-      Background="#0B0D12"
-      Language="es-MX">
+﻿<Window x:Class="Secorvi.Mapa"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Radar de Ubicaciones - SECORVI"
+        Height="800" Width="1100"
+        WindowStartupLocation="CenterOwner"
+        Background="#0B0D12"
+        Language="es-MX"
+        WindowStyle="None" AllowsTransparency="True">
 
-    <Page.Resources>
+    <Window.Resources>
         <Style x:Key="ModernInput" TargetType="TextBox">
             <Setter Property="Background" Value="#12161D"/>
             <Setter Property="Foreground" Value="White"/>
@@ -14,151 +17,114 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,5"/>
             <Setter Property="CaretBrush" Value="#FFB300"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
+    </Window.Resources>
 
-        <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#1E2229"/>
-            <Setter Property="Foreground" Value="#E0E0E0"/>
-            <Setter Property="BorderBrush" Value="#2D323E"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" 
-                                BorderBrush="{TemplateBinding BorderBrush}" 
-                                BorderThickness="{TemplateBinding BorderThickness}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Page.Resources>
+    <Border BorderBrush="#2D323E" BorderThickness="1">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="380"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="400"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Background="#161920" BorderBrush="#2D323E" BorderThickness="0,0,1,0">
+                <Grid Margin="15">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-        <Border Background="#161920" BorderBrush="#2D323E" BorderThickness="0,0,1,0">
-            <Grid Margin="20">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <StackPanel Grid.Row="0" Margin="0,0,0,15">
-                    <Button Content="← VOLVER AL PANEL"
-                            Click="BtnRegresar_Click"
-                            Background="Transparent"
-                            Foreground="#4B5563"
-                            FontSize="10"
-                            FontWeight="Bold"
-                            HorizontalAlignment="Left"
-                            BorderThickness="0"
-                            Cursor="Hand"
-                            Margin="0,0,0,10"/>
-
-                    <TextBlock Text="SECORVI RADAR"
-                               Foreground="#FFB300"
-                               FontSize="24"
-                               FontWeight="Black"/>
-
-                    <TextBlock x:Name="lblEmpleadoActivo" 
-                               Text="SIN AGENTE SELECCIONADO" 
-                               Foreground="#2ECC71" 
-                               FontSize="11" 
-                               FontWeight="Bold"
-                               Margin="0,2,0,0"/>
-                </StackPanel>
-
-                <TextBox x:Name="txtBusqueda"
-                         Grid.Row="1"
-                         Style="{StaticResource ModernInput}"
-                         Margin="0,0,0,10"
-                         TextChanged="TxtBusqueda_TextChanged"
-                         ToolTip="Filtrar por nombre de agente..."/>
-
-                <ListBox x:Name="lstEmpleados"
-                         Grid.Row="2"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         Margin="0,0,0,10"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Border x:Name="itemBorder" 
-                                    Background="#1A1F26" 
-                                    BorderBrush="#2D323E" 
-                                    BorderThickness="1" 
-                                    Padding="12,10" 
-                                    Margin="0,0,0,6">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Nombre}" Foreground="White" FontSize="12" FontWeight="Bold"/>
-                                    <TextBlock Text="{Binding Matricula}" Foreground="#FFB300" FontSize="10" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-
-                <Border Grid.Row="3" Background="#11141B" BorderBrush="#2D323E" BorderThickness="1" Padding="15" Margin="0,5,0,15">
-                    <StackPanel>
-                        <TextBlock Text="CONFIGURACIÓN DE GEOCERCA" Foreground="#FFB300" FontSize="11" FontWeight="Black" Margin="0,0,0,15"/>
-
-                        <UniformGrid Columns="2" Margin="0,0,0,12">
-                            <StackPanel Margin="0,0,5,0">
-                                <TextBlock Text="HORA ENTRADA" Foreground="#6B7280" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
-                                <TextBox x:Name="txtHoraInicio" Text="08:00" Style="{StaticResource ModernInput}"/>
-                            </StackPanel>
-                            <StackPanel Margin="5,0,0,0">
-                                <TextBlock Text="HORA SALIDA" Foreground="#6B7280" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
-                                <TextBox x:Name="txtHoraFin" Text="16:00" Style="{StaticResource ModernInput}"/>
-                            </StackPanel>
-                        </UniformGrid>
-
-                        <TextBlock Text="FECHA DE SERVICIO" Foreground="#6B7280" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
-                        <DatePicker x:Name="dpFecha" Margin="0,0,0,12" Background="#12161D" BorderBrush="#2D323E"/>
-
-                        <TextBlock Text="ETIQUETA DEL PUNTO (CLIENTE/SERVICIO)" Foreground="#6B7280" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
-                        <TextBox x:Name="txtNombrePunto" Style="{StaticResource ModernInput}" Foreground="#FFB300" FontWeight="Bold" Margin="0,0,0,15"/>
-
-                        <TextBlock Text="RADIO DE TOLERANCIA" Foreground="#6B7280" FontSize="9" FontWeight="Bold" Margin="0,0,0,8"/>
-                        <UniformGrid Columns="2" Margin="0,0,0,12">
-                            <Button Content="100 METROS" Click="BtnRango100_Click" Style="{StaticResource SecondaryButton}" Height="30" Margin="0,0,4,0"/>
-                            <Button Content="200 METROS" Click="BtnRango200_Click" Style="{StaticResource SecondaryButton}" Height="30" Margin="4,0,0,0"/>
-                        </UniformGrid>
-
-                        <Border Background="#0B0D12" Padding="8" BorderBrush="#2D323E" BorderThickness="1">
-                            <TextBlock x:Name="txtCoords" Text="PUNTO NO MARCADO" Foreground="#2ECC71" FontSize="10" HorizontalAlignment="Center" FontWeight="Black"/>
+                    <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                        <TextBlock Text="SECORVI RADAR" Foreground="#FFB300" FontSize="20" FontWeight="Black"/>
+                        <Border Background="#0F111A" CornerRadius="2" Padding="8,4" Margin="0,5,0,0">
+                            <TextBlock x:Name="lblEmpleadoActivo" Text="AGENTE SELECCIONADO: ---" Foreground="#2ECC71" FontSize="11" FontWeight="Bold"/>
                         </Border>
                     </StackPanel>
-                </Border>
 
-                <Button Grid.Row="4"
-                        Click="BtnGuardar_Click"
-                        Height="55"
-                        Background="#FFB300"
-                        Foreground="#0F111A"
-                        FontWeight="Black"
-                        FontSize="15"
-                        Content="GUARDAR ASIGNACIÓN">
-                    <Button.Template>
-                        <ControlTemplate TargetType="Button">
-                            <Border Background="{TemplateBinding Background}" CornerRadius="2">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Grid Grid.Row="1" Margin="0,0,0,10">
+                        <TextBox x:Name="txtBusqueda" Style="{StaticResource ModernInput}" Padding="28,5,5,5"/>
+                        <TextBlock Text="🔍" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="8,0,0,0" Foreground="#4B5563" IsHitTestVisible="False"/>
+                    </Grid>
+
+                    <Grid Grid.Row="2" Margin="0,0,0,10">
+                        <ListBox x:Name="lstUbicaciones" Background="Transparent" BorderThickness="0" 
+                                 SelectionMode="Extended" SelectionChanged="lstUbicaciones_SelectionChanged">
+                            <ListBox.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="🗑️ ELIMINAR SELECCIÓN" Click="BtnEliminarVarios_Click"/>
+                                    <Separator/>
+                                    <MenuItem Header="❌ CANCELAR" Click="BtnCancelarSeleccion_Click"/>
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#1A1F26" BorderBrush="#2D323E" BorderThickness="1" Padding="10" Margin="0,0,0,5" CornerRadius="2">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="📍" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Nombre}" Foreground="White" FontWeight="Bold"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+
+                        <Button x:Name="btnEliminarVarios" Content="🗑️ BORRAR SELECCIONADOS" 
+                                VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="5"
+                                Background="#CC0000" Foreground="White" FontSize="9" FontWeight="Bold"
+                                Padding="8,4" Click="BtnEliminarVarios_Click" Visibility="Collapsed"/>
+                    </Grid>
+
+                    <Border Grid.Row="3" Background="#11141B" BorderBrush="#2D323E" BorderThickness="1" Padding="12" Margin="0,0,0,15">
+                        <StackPanel>
+                            <UniformGrid Columns="2" Margin="0,0,0,10">
+                                <StackPanel Margin="0,0,4,0">
+                                    <TextBlock Text="HORA ENTRADA" Foreground="#6B7280" FontSize="8" FontWeight="Bold"/>
+                                    <TextBox x:Name="txtHoraInicio" Text="07:00 AM" Style="{StaticResource ModernInput}"/>
+                                </StackPanel>
+                                <StackPanel Margin="4,0,0,0">
+                                    <TextBlock Text="HORA SALIDA" Foreground="#6B7280" FontSize="8" FontWeight="Bold"/>
+                                    <TextBox x:Name="txtHoraFin" Text="04:00 PM" Style="{StaticResource ModernInput}"/>
+                                </StackPanel>
+                            </UniformGrid>
+                            <TextBlock Text="FECHA DE SERVICIO" Foreground="#6B7280" FontSize="8" FontWeight="Bold" Margin="0,0,0,2"/>
+                            <DatePicker x:Name="dpFecha" Margin="0,0,0,10"/>
+                            <TextBlock Text="NOMBRE DEL PUNTO / CLIENTE" Foreground="#6B7280" FontSize="8" FontWeight="Bold" Margin="0,0,0,2"/>
+                            <TextBox x:Name="txtNombrePunto" Style="{StaticResource ModernInput}" Margin="0,0,0,10"/>
+                            <Border Background="#0B0D12" Padding="5" BorderBrush="#2D323E" BorderThickness="1">
+                                <TextBlock x:Name="txtCoords" Text="PUNTO NO MARCADO" Foreground="#2ECC71" FontSize="9" HorizontalAlignment="Center" FontWeight="Bold"/>
                             </Border>
-                        </ControlTemplate>
-                    </Button.Template>
-                </Button>
-            </Grid>
-        </Border>
+                        </StackPanel>
+                    </Border>
 
-        <wv2:WebView2 x:Name="mapaWebView" Grid.Column="1" DefaultBackgroundColor="#0F111A"/>
-    </Grid>
-</Page>
+                    <Border Grid.Row="4" Background="#0F111A" CornerRadius="4" Padding="10" Margin="0,0,0,10" BorderBrush="#2D323E" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock Text="GUÍA DE USO RÁPIDO:" Foreground="#FFB300" FontSize="9" FontWeight="Bold" Margin="0,0,0,5"/>
+                            <TextBlock Text="• CLICK EN MAPA: Define coordenadas." Foreground="#CCC" FontSize="8" Margin="0,0,0,2"/>
+                            <TextBlock Text="• CLICK DERECHO (LISTA): Elimina puntos." Foreground="#CCC" FontSize="8" Margin="0,0,0,2"/>
+                            <TextBlock Text="• CTRL + CLICK: Selecciona varios para borrar." Foreground="#CCC" FontSize="8" Margin="0,0,0,2"/>
+                            <TextBlock Text="• GUARDAR: Vincula punto y horario al agente." Foreground="#CCC" FontSize="8"/>
+                        </StackPanel>
+                    </Border>
+
+                    <UniformGrid Grid.Row="5" Columns="2">
+                        <Button Content="CANCELAR" Click="BtnCancelar_Click" Height="45" Background="#2D323E" Foreground="White" Margin="0,0,5,0" Cursor="Hand"/>
+                        <Button Content="GUARDAR" Click="BtnGuardar_Click" Height="45" Background="#FFB300" Foreground="#0F111A" FontWeight="Bold" Cursor="Hand"/>
+                    </UniformGrid>
+                </Grid>
+            </Border>
+
+            <wv2:WebView2 x:Name="mapaWebView" Grid.Column="1" DefaultBackgroundColor="#0F111A"/>
+        </Grid>
+    </Border>
+</Window>

@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Secorvi.Models;
-using System.Globalization;
 using Microsoft.VisualBasic;
 
 namespace Secorvi
@@ -12,101 +12,97 @@ namespace Secorvi
     public partial class PanelDeControl : Page
     {
         private List<Empleado> _empleadosCache = new List<Empleado>();
-        private const string ADMIN_PASSWORD = "admin123";
 
         public PanelDeControl()
         {
             InitializeComponent();
-            this.Loaded += (s, e) => {
-                txtTarifaGlobal.Text = DataService.TarifaHoraGlobal.ToString();
-                CargarDatos();
-            };
+            this.Loaded += (s, e) => CargarDatos();
         }
 
         private void CargarDatos()
         {
-            DataService.CargarTodo();
-            _empleadosCache = DataService.CargarEmpleados();
-            ActualizarTodo();
-        }
+            _empleadosCache = DataService.Empleados;
 
-        private void BtnActualizarTarifa_Click(object sender, RoutedEventArgs e)
-        {
-            string inputPass = Interaction.InputBox("Ingrese contraseña de administrador:", "Seguridad", "");
-
-            if (inputPass == ADMIN_PASSWORD)
+            foreach (var emp in _empleadosCache)
             {
-                if (decimal.TryParse(txtTarifaGlobal.Text, out decimal nuevaTarifa))
+                var ultimaAsis = DataService.HistorialAsistencias
+                    .Where(a => a.IdEmpleado == emp.Id)
+                    .OrderByDescending(a => a.FechaHora)
+                    .FirstOrDefault();
+
+                if (ultimaAsis != null)
                 {
-                    DataService.TarifaHoraGlobal = nuevaTarifa;
-                    DataService.GuardarTodo();
-                    ActualizarTodo();
-                    MessageBox.Show("Tarifa global actualizada.", "Éxito");
+                    emp.UltimoReporteHora = $"{ultimaAsis.FechaHora:HH:mm} hrs";
+                    emp.UltimoReporteStatus = ultimaAsis.DentroDeRango ? "DENTRO DE RANGO" : "FUERA DE RANGO";
+                    emp.UltimoReporteUbicacion = ultimaAsis.Incidencias;
+                    emp.ColorStatus = ultimaAsis.DentroDeRango ? "#2ECC71" : "#E74C3C";
                 }
                 else
                 {
-                    MessageBox.Show("Monto no válido.");
-                    txtTarifaGlobal.Text = DataService.TarifaHoraGlobal.ToString();
+                    emp.UltimoReporteHora = "SIN REPORTE";
+                    emp.UltimoReporteStatus = "PENDIENTE";
+                    emp.UltimoReporteUbicacion = "Esperando señal de n8n...";
+                    emp.ColorStatus = "#4B5563";
                 }
             }
-            else if (!string.IsNullOrEmpty(inputPass))
-            {
-                MessageBox.Show("Acceso denegado.");
-                txtTarifaGlobal.Text = DataService.TarifaHoraGlobal.ToString();
-            }
-        }
 
-        private void ActualizarTodo()
-        {
-            foreach (var emp in _empleadosCache)
-            {
-                emp.TotalSueldo = DataService.CalcularSueldoEmpleado(emp);
-            }
             FiltrarYMostrar();
         }
-
+        
+        private void DgEmpleados_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                // Tony: Verificamos que realmente se haya seleccionado un ítem para evitar el error de rango
+                if (dgEmpleados.SelectedItem is Empleado seleccionado)
+                {
+                    if (this.NavigationService != null)
+                    {
+                        this.NavigationService.Navigate(new CalendarioEmpleado(seleccionado));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error en Doble Clic: " + ex.Message);
+            }
+        }
         private void FiltrarYMostrar()
         {
+            if (txtBusqueda == null || dgEmpleados == null) return;
             string filtro = txtBusqueda.Text.ToLower().Trim();
 
             var listaFiltrada = _empleadosCache.Where(emp =>
                 emp.Nombre.ToLower().Contains(filtro) ||
-                (emp.Telefono != null && emp.Telefono.Contains(filtro)) ||
-                emp.Matricula.ToLower().Contains(filtro)
+                (emp.Matricula != null && emp.Matricula.ToLower().Contains(filtro))
             ).ToList();
 
             dgEmpleados.ItemsSource = null;
             dgEmpleados.ItemsSource = listaFiltrada;
 
-            decimal subtotalNominas = listaFiltrada.Sum(x => x.TotalSueldo);
+            if (lblTotal != null) lblTotal.Text = $"AGENTES REGISTRADOS: {listaFiltrada.Count}";
+            if (lblStatus != null) lblStatus.Text = $"SESIÓN: {SesionActual.Usuario?.Nombre.ToUpper()} | ROL: {(SesionActual.Usuario.EsSuperAdmin ? "SUPERADMIN" : "ADMIN")}";
+        }
 
-            if (decimal.TryParse(txtMontoGasto.Text, out decimal montoGastos))
+        // Navegación mediante doble clic en la fila
+        private void BtnCalendario_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is Empleado seleccionado)
             {
-                decimal granTotal = subtotalNominas + montoGastos;
-                txtSubtotal.Text = granTotal.ToString("C2", CultureInfo.GetCultureInfo("es-MX"));
-            }
-            else
-            {
-                txtSubtotal.Text = subtotalNominas.ToString("C2", CultureInfo.GetCultureInfo("es-MX"));
+                Dispatcher.BeginInvoke(new Action(() => {
+                    if (this.NavigationService != null)
+                    {
+                        this.NavigationService.Navigate(new CalendarioEmpleado(seleccionado));
+                    }
+                }), System.Windows.Threading.DispatcherPriority.Background);
             }
         }
 
         private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e) => FiltrarYMostrar();
 
-        private void TxtMontoGasto_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (txtSubtotal != null) FiltrarYMostrar();
-        }
-
-        private void BtnMapa_Click(object sender, RoutedEventArgs e)
-        {
-            this.NavigationService.Navigate(new Mapa());
-        }
-
         private void BtnNuevo_Click(object sender, RoutedEventArgs e)
         {
-            int proximoId = _empleadosCache.Count > 0 ? _empleadosCache.Max(emp => emp.Id) + 1 : 1;
-            RegistroEmpleado win = new RegistroEmpleado(proximoId);
+            RegistroEmpleado win = new RegistroEmpleado();
             win.Owner = Window.GetWindow(this);
             if (win.ShowDialog() == true) CargarDatos();
         }
@@ -115,60 +111,42 @@ namespace Secorvi
         {
             if (dgEmpleados.SelectedItem is Empleado seleccionado)
             {
-                MessageBoxResult res = MessageBox.Show(
-                    $"¿Está seguro de que desea dar de baja definitiva al agente {seleccionado.Nombre}?",
-                    "Confirmar Eliminación",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Warning);
-
-                if (res == MessageBoxResult.Yes)
+                if (seleccionado.EsSuperAdmin)
                 {
-                    DataService.EliminarEmpleado(seleccionado.Matricula);
-                    CargarDatos();
-                    MessageBox.Show("Agente eliminado correctamente.", "Sistema");
+                    MessageBox.Show("El Administrador Principal no puede ser eliminado por seguridad.", "Acción Denegada");
+                    return;
                 }
-            }
-            else
-            {
-                MessageBox.Show("Por favor, seleccione un agente de la tabla primero.", "Aviso");
+
+                string pass = Interaction.InputBox($"Confirme con su contraseña para eliminar a ({seleccionado.Nombre}):", "Seguridad de Datos", "");
+
+                if (string.IsNullOrEmpty(pass)) return;
+
+                if (pass == SesionActual.Usuario.Password)
+                {
+                    DataService.EliminarEmpleado(seleccionado.Id);
+                    CargarDatos();
+                }
+                else { MessageBox.Show("Contraseña de administrador incorrecta.", "Error"); }
             }
         }
 
-        // MÉTODO ACTUALIZADO CON CALENDARIO
-        private void BtnDiaLibre_Click(object sender, RoutedEventArgs e)
+        private void BtnRoles_Click(object sender, RoutedEventArgs e)
         {
             if (dgEmpleados.SelectedItem is Empleado seleccionado)
             {
-                // 1. Abrir tu ventana de calendario
-                SeleccionarFechaLibre win = new SeleccionarFechaLibre();
-                win.Owner = Window.GetWindow(this);
+                if (seleccionado.EsSuperAdmin) return;
 
-                if (win.ShowDialog() == true)
+                string pass = Interaction.InputBox($"Autorice el cambio de rango para ({seleccionado.Nombre}):", "Gestión de Permisos", "");
+
+                if (string.IsNullOrEmpty(pass)) return;
+
+                if (pass == SesionActual.Usuario.Password)
                 {
-                    // 2. Obtener la fecha seleccionada de la ventana
-                    DateTime fecha = win.FechaSeleccionada;
-
-                    // 3. Convertir la fecha al nombre del día (sin tildes para que coincida con el DataService)
-                    string diaSemana = fecha.ToString("dddd", new CultureInfo("es-MX"))
-                                            .ToLower()
-                                            .Replace("á", "a")
-                                            .Replace("é", "e")
-                                            .Replace("í", "i")
-                                            .Replace("ó", "o")
-                                            .Replace("ú", "u");
-
-                    // 4. Aplicar el cambio en el servicio de datos
-                    DataService.AsignarDiaLibre(seleccionado.Matricula, diaSemana);
-
-                    // 5. Recargar la tabla
+                    seleccionado.EsAdmin = !seleccionado.EsAdmin;
+                    DataService.GuardarTodo();
                     CargarDatos();
-
-                    MessageBox.Show($"Día {diaSemana.ToUpper()} marcado como LIBRE para {seleccionado.Nombre}.", "Éxito");
                 }
-            }
-            else
-            {
-                MessageBox.Show("Debe seleccionar un agente de la tabla para asignar un descanso.", "Aviso");
+                else { MessageBox.Show("Autorización denegada."); }
             }
         }
     }

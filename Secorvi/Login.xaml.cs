@@ -1,9 +1,9 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
-// esto es la ventana de login, la cual se encarga de validar las credenciales del usuario
-//modificaremos luego
+using Secorvi.Models;
 
 namespace Secorvi
 {
@@ -12,42 +12,58 @@ namespace Secorvi
         public Login()
         {
             InitializeComponent();
+            // Aseguramos carga de datos al iniciar
+            DataService.CargarTodo();
         }
 
         private async void BtnLogin_Click(object sender, RoutedEventArgs e)
         {
-            string usuario = txtUser.Text.Trim();
-            string password = txtPass.Password;
+            string usuarioInput = txtUser.Text.Trim();
+            string passwordInput = txtPass.Password;
 
-            if (usuario == "Rommel" && password == "1234")
+            if (string.IsNullOrWhiteSpace(usuarioInput) || string.IsNullOrWhiteSpace(passwordInput))
             {
-                MostrarAviso("ACCESO CONCEDIDO - BIENVENIDO COMANDANTE", "#2D5A27", "#88FF88");
-                await Task.Delay(1000);
+                MostrarAviso("INGRESE SUS CREDENCIALES", "#5A5A27", "#FFFF88");
+                return;
+            }
 
-                ContenedorPrincipal principal = new ContenedorPrincipal();
+            // Búsqueda en DataService
+            var userLogueado = DataService.Empleados.FirstOrDefault(u =>
+                (u.Nombre.Equals(usuarioInput, StringComparison.OrdinalIgnoreCase) ||
+                 u.Matricula.Equals(usuarioInput, StringComparison.OrdinalIgnoreCase))
+                && u.Password == passwordInput);
 
-                principal.MainFrame.Navigate(new PanelDeControl());
+            if (userLogueado != null)
+            {
+                if (userLogueado.EsAdmin)
+                {
+                    SesionActual.Usuario = userLogueado;
+                    MostrarAviso($"ACCESO CONCEDIDO - HOLA {userLogueado.Nombre.Split(' ')[0].ToUpper()}", "#2D5A27", "#88FF88");
 
-                principal.Show();
-                this.Close();
+                    await Task.Delay(800);
+                    ContenedorPrincipal principal = new ContenedorPrincipal();
+                    principal.Show();
+                    principal.MainFrame.Navigate(new PanelDeControl());
+                    this.Close();
+                }
+                else
+                {
+                    MostrarAviso("ERROR: SIN RANGO DE JEFE", "#5A2727", "#FF8888");
+                }
             }
             else
             {
-                MostrarAviso("ERROR: CREDENCIALES NO VÁLIDAS", "#5A2727", "#FF8888");
+                MostrarAviso("ERROR: CREDENCIALES INCORRECTAS", "#5A2727", "#FF8888");
             }
         }
 
         private void MostrarAviso(string mensaje, string colorFondo, string colorTexto)
         {
-            try
-            {
-                var bc = new BrushConverter();
-                brdStatus.Background = (Brush)bc.ConvertFrom(colorFondo);
-                txtStatusMsg.Text = mensaje;
-                txtStatusMsg.Foreground = (Brush)bc.ConvertFrom(colorTexto);
-                brdStatus.Visibility = Visibility.Visible;
-            }
-            catch { brdStatus.Visibility = Visibility.Visible; }
+            var bc = new BrushConverter();
+            brdStatus.Background = (Brush)bc.ConvertFrom(colorFondo);
+            txtStatusMsg.Text = mensaje;
+            txtStatusMsg.Foreground = (Brush)bc.ConvertFrom(colorTexto);
+            brdStatus.Visibility = Visibility.Visible;
         }
 
         private void BtnSalir_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();

@@ -9,249 +9,208 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Globalization;
 
-// esto es la página del mapa, la cual se encarga de mostrar el mapa interactivo y permitir asignar puntos de servicio a los empleados. Utiliza WebView2 para mostrar un mapa de Leaflet con OpenStreetMap, y permite buscar direcciones, seleccionar puntos en el mapa y guardar las asignaciones. También actualiza la nómina del empleado según el turno asignado.
 namespace Secorvi
 {
-    public partial class Mapa : Page
+    public partial class Mapa : Window
     {
         private double _selectedLat = 0;
         private double _selectedLng = 0;
-        private double rangoActual = 0.2;
+        private int _idEmpleadoPreseleccionado;
+        private DateTime _fechaAsignacion;
 
-        public Mapa()
+        public Mapa(int idEmpleado = 0, DateTime? fechaAsignacion = null)
         {
             InitializeComponent();
-            lstEmpleados.ItemsSource = DataService.CargarEmpleados();
-            this.Loaded += async (s, e) => await InitMap();
+            _idEmpleadoPreseleccionado = idEmpleado;
+            _fechaAsignacion = fechaAsignacion ?? DateTime.Today;
 
-            lstEmpleados.SelectionChanged += (s, e) => {
-                if (lstEmpleados.SelectedItem is Empleado emp)
-                {
-                    lblEmpleadoActivo.Text = $"AGENTE: {emp.Nombre}";
-                    txtNombrePunto.Text = emp.PuntoServicio ?? "";
+            if (dpFecha != null) dpFecha.SelectedDate = _fechaAsignacion;
 
-                    var asig = DataService.Asignaciones.FirstOrDefault(a => a.EmpleadoId == emp.Id);
-                    if (asig != null)
-                    {
-                        var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.Id == asig.UbicacionId);
-                        if (ubi != null)
-                        {
-                            _selectedLat = ubi.Latitud;
-                            _selectedLng = ubi.Longitud;
-                            rangoActual = ubi.RadioCerca > 0 ? ubi.RadioCerca : 0.2;
-                            ActualizarMapaJS(true);
-                        }
-                    }
-                }
+            var emp = DataService.Empleados.FirstOrDefault(e => e.Id == _idEmpleadoPreseleccionado);
+            lblEmpleadoActivo.Text = emp == null
+                ? "🗺️ GESTIÓN DE UBICACIONES"
+                : $"👤 ASIGNAR A: {emp.Nombre.ToUpper()}";
+
+            this.Loaded += async (s, e) =>
+            {
+                await InitMap();
+                RefrescarListaUbicaciones();
             };
+
+            if (txtBusqueda != null)
+                txtBusqueda.TextChanged += (s, e) =>
+                {
+                    string bus = txtBusqueda.Text.ToUpper();
+                    lstUbicaciones.ItemsSource = DataService.Ubicaciones
+                        .Where(u => u.Nombre.ToUpper().Contains(bus))
+                        .OrderBy(u => u.Nombre).ToList();
+                };
         }
 
+        private void RefrescarListaUbicaciones()
+        {
+            lstUbicaciones.ItemsSource = null;
+            lstUbicaciones.ItemsSource = DataService.Ubicaciones.OrderBy(u => u.Nombre).ToList();
+        }
+
+        // --- ESTE ES EL MÉTODO QUE FALTABA ---
         private void ActualizarMapaJS(bool move)
         {
             if (mapaWebView?.CoreWebView2 == null || _selectedLat == 0) return;
+
+            // Usamos InvariantCulture para que los decimales sean con punto (.) y no con coma (,)
             string lat = _selectedLat.ToString(CultureInfo.InvariantCulture);
             string lng = _selectedLng.ToString(CultureInfo.InvariantCulture);
-            string rad = rangoActual.ToString(CultureInfo.InvariantCulture);
-            mapaWebView.ExecuteScriptAsync($"window.updateVisuals({lat}, {lng}, {rad}, {(move ? "true" : "false")})");
+
+            // Ejecutamos la función que está dentro del HTML del mapa
+            mapaWebView.ExecuteScriptAsync($"window.updateVisuals({lat}, {lng}, 200, {(move ? "true" : "false")})");
         }
 
         private async Task InitMap()
         {
-            await mapaWebView.EnsureCoreWebView2Async();
-            mapaWebView.CoreWebView2.Settings.UserAgent = "Mozilla/5.0 SecorviApp/1.0";
-
-            mapaWebView.WebMessageReceived += (s, e) => {
-                try
-                {
-                    var json = JsonDocument.Parse(e.WebMessageAsJson);
-                    _selectedLat = json.RootElement.GetProperty("lat").GetDouble();
-                    _selectedLng = json.RootElement.GetProperty("lng").GetDouble();
-                    Dispatcher.Invoke(() => {
-                        txtCoords.Text = $"COORD: {_selectedLat:F4}, {_selectedLng:F4}";
-                        ActualizarMapaJS(false);
-                    });
-                }
-                catch { }
-            };
-            // NO MOVER  ESTO ES EL MAPA!!!
-            string html = @"<!DOCTYPE html><html><head><meta charset='utf-8'/>
-                <link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>
-                <script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
-                <style>
-                    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
-                    body{margin:0; padding:0; font-family: 'Roboto', sans-serif;} #map{height:100vh; width:100vw;}
-                    .search-box{
-                        position:absolute; top:20px; right:20px; z-index:1000; 
-                        background:#ffffff; border-radius:2px; border:1px solid #ccc;
-                        width:320px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                    }
-                    .input-group{ display:flex; background:#fff; }
-                    .search-box input{
-                        border:none; background:transparent; color:#202124; 
-                        padding:12px; outline:none; flex-grow:1; font-size:15px;
-                    }
-                    .search-box button{background:#fff; border:none; cursor:pointer; padding:0 15px; color:#4285f4; font-size:18px;}
-                    #results{
-                        background:#fff; max-height:300px; overflow-y:auto; 
-                        display:none; border-top:1px solid #eee;
-                    }
-                    .result-item{
-                        padding:12px 15px; color:#3c4043; cursor:pointer; font-size:13px;
-                        border-bottom:1px solid #eee; transition: background 0.2s;
-                    }
-                    .result-item:hover{ background:#f1f3f4; }
-                    .result-item b { color: #202124; }
-                </style></head>
-                <body>
-                    <div class='search-box'>
-                        <div class='input-group'>
-                            <input type='text' id='adr' placeholder='Buscar en Monterrey...' oninput='autoComplete()'>
-                            <button onclick='geo()'>🔍</button>
-                        </div>
-                        <div id='results'></div>
-                    </div>
-                    <div id='map'></div>
-                    <script>
-                        const map = L.map('map', {zoomControl: false}).setView([25.6844, -100.3161], 12);
-                        L.control.zoom({position: 'bottomright'}).addTo(map);
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-                        let m=null, c=null;
-                        const viewbox = '-100.6,25.4,-99.9,25.9'; 
-
-                        window.updateVisuals = (la, lo, ra, mo) => {
-                            if(m) map.removeLayer(m); if(c) map.removeLayer(c);
-                            m = L.marker([la, lo]).addTo(map);
-                            c = L.circle([la, lo], {radius: ra*1000, color:'#4285f4', fillColor:'#4285f4', fillOpacity:0.2, weight:1}).addTo(map);
-                            if(mo) map.setView([la, lo], 16);
-                        };
-
-                        map.on('click', (e) => { window.chrome.webview.postMessage({lat: e.latlng.lat, lng: e.latlng.lng}); });
-
-                        let timeout = null;
-                        async function autoComplete() {
-                            const q = document.getElementById('adr').value;
-                            const resDiv = document.getElementById('results');
-                            if(q.length < 3) { resDiv.style.display = 'none'; return; }
-                            clearTimeout(timeout);
-                            timeout = setTimeout(async () => {
-                                const url = `https://nominatim.openstreetmap.org/search?format=json&q=${q}&viewbox=${viewbox}&bounded=1&limit=5&addressdetails=1`;
-                                const r = await fetch(url);
-                                const data = await r.json();
-                                resDiv.innerHTML = '';
-                                if(data.length > 0) {
-                                    resDiv.style.display = 'block';
-                                    data.forEach(item => {
-                                        const div = document.createElement('div');
-                                        div.className = 'result-item';
-                                        const name = item.display_name.split(',').slice(0,3).join(',');
-                                        div.innerHTML = `<b>${name}</b>`;
-                                        div.onclick = () => selectItem(item.lat, item.lon, name);
-                                        resDiv.appendChild(div);
-                                    });
-                                }
-                            }, 300);
-                        }
-                        function selectItem(lat, lon, name) {
-                            const la = parseFloat(lat), lo = parseFloat(lon);
-                            document.getElementById('adr').value = name;
-                            document.getElementById('results').style.display = 'none';
-                            map.setView([la, lo], 16);
-                            window.chrome.webview.postMessage({lat: la, lng: lo});
-                        }
-                        async function geo() {
-                            const q = document.getElementById('adr').value;
-                            if(!q) return;
-                            const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&viewbox=${viewbox}&bounded=1&limit=1`);
-                            const d = await r.json();
-                            if(d.length > 0) selectItem(d[0].lat, d[0].lon, d[0].display_name);
-                        }
-                    </script></body></html>";
-            mapaWebView.NavigateToString(html);
-        }
-
-        private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (lstEmpleados == null) return;
-            lstEmpleados.ItemsSource = DataService.CargarEmpleados()
-                .Where(x => x.Nombre.ToUpper().Contains(txtBusqueda.Text.ToUpper())).ToList();
-        }
-
-        private void BtnRegresar_Click(object sender, RoutedEventArgs e) => this.NavigationService.GoBack();
-        private void BtnRango100_Click(object sender, RoutedEventArgs e) { rangoActual = 0.1; ActualizarMapaJS(false); }
-        private void BtnRango200_Click(object sender, RoutedEventArgs e) { rangoActual = 0.2; ActualizarMapaJS(false); }
-
-        private async void BtnGuardar_Click(object sender, RoutedEventArgs e)
-        {
-            if (lstEmpleados.SelectedItem is not Empleado emp || _selectedLat == 0)
+            try
             {
-                MessageBox.Show("Seleccione un agente y un punto en el mapa.");
+                await mapaWebView.EnsureCoreWebView2Async();
+                mapaWebView.WebMessageReceived += (s, e) =>
+                {
+                    try
+                    {
+                        using (JsonDocument doc = JsonDocument.Parse(e.WebMessageAsJson))
+                        {
+                            _selectedLat = doc.RootElement.GetProperty("lat").GetDouble();
+                            _selectedLng = doc.RootElement.GetProperty("lng").GetDouble();
+                            Dispatcher.Invoke(() =>
+                            {
+                                txtCoords.Text = $"{_selectedLat:F6}, {_selectedLng:F6}";
+                                ActualizarMapaJS(false);
+                            });
+                        }
+                    }
+                    catch { /* Ignorar errores de parsing */ }
+                };
+
+                string html = @"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'/>
+    <link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>
+    <script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
+    <style>
+        body { margin:0; padding:0; background:#0F111A; }
+        #map { height:100vh; width:100vw; background:#0F111A; }
+        .leaflet-tile { 
+            filter: brightness(0.7) invert(0.9) contrast(1.2) hue-rotate(200deg) saturate(0.8) !important; 
+        }
+        .leaflet-control-zoom { background:#1E252F !important; border:#2D323E 1px solid !important; }
+    </style>
+</head>
+<body>
+    <div id='map'></div>
+    <script>
+        const map = L.map('map', { zoomControl: true }).setView([25.6844, -100.3161], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        
+        let marker = null, circle = null;
+        
+        window.updateVisuals = function(lat, lng, radius, moveTo) {
+            if (marker) map.removeLayer(marker);
+            if (circle) map.removeLayer(circle);
+            
+            marker = L.marker([lat, lng]).addTo(map);
+            circle = L.circle([lat, lng], { radius: radius, color: '#FFB300', fillOpacity: 0.25 }).addTo(map);
+            
+            if (moveTo) map.setView([lat, lng], 16);
+        };
+        
+        map.on('click', function(e) {
+            window.chrome.webview.postMessage({ lat: e.latlng.lat, lng: e.latlng.lng });
+        });
+    </script>
+</body></html>";
+
+                mapaWebView.NavigateToString(html);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("❌ Error WebView2: " + ex.Message);
+            }
+        }
+
+        private void lstUbicaciones_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (lstUbicaciones.SelectedItem is Ubicacion u)
+            {
+                txtNombrePunto.Text = u.Nombre;
+                _selectedLat = u.Latitud;
+                _selectedLng = u.Longitud;
+                txtCoords.Text = $"{_selectedLat:F6}, {_selectedLng:F6}";
+                ActualizarMapaJS(true);
+            }
+        }
+
+        private void BtnGuardar_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedLat == 0 || string.IsNullOrEmpty(txtNombrePunto.Text))
+            {
+                MessageBox.Show("Seleccione un punto en el mapa y asigne un nombre.");
                 return;
             }
 
-            // Crear nueva ubicación
-            var ubi = new Ubicacion
+            try
             {
-                Id = DataService.Ubicaciones.Count + 1,
-                Nombre = string.IsNullOrWhiteSpace(txtNombrePunto.Text) ? "PUNTO NUEVO" : txtNombrePunto.Text.ToUpper(),
-                Latitud = _selectedLat,
-                Longitud = _selectedLng,
-                RadioCerca = rangoActual
-            };
-            DataService.Ubicaciones.Add(ubi);
-
-            // Vincular asignación
-            DataService.Asignaciones.RemoveAll(a => a.EmpleadoId == emp.Id);
-            DataService.Asignaciones.Add(new Asignacion
-            {
-                Id = DataService.Asignaciones.Count + 1,
-                EmpleadoId = emp.Id,
-                UbicacionId = ubi.Id
-            });
-
-            // REFLEJAR EN NÓMINA 
-            if (dpFecha.SelectedDate.HasValue)
-            {
-                string diaSemana = dpFecha.SelectedDate.Value.ToString("dddd", new CultureInfo("en-US"));
-                string tipo = emp.TurnoTipo ?? "12/D";
-                string valorTurno = tipo.Contains("12") ? "12" : (tipo.Contains("24") ? "24" : "D");
-
-                switch (diaSemana)
+                var ubiMaestra = DataService.Ubicaciones.FirstOrDefault(u => u.Nombre.ToUpper() == txtNombrePunto.Text.ToUpper());
+                if (ubiMaestra == null)
                 {
-                    case "Monday": emp.Lunes = valorTurno; break;
-                    case "Tuesday": emp.Martes = valorTurno; break;
-                    case "Wednesday": emp.Miercoles = valorTurno; break;
-                    case "Thursday": emp.Jueves = valorTurno; break;
-                    case "Friday": emp.Viernes = valorTurno; break;
-                    case "Saturday": emp.Sabado = valorTurno; break;
-                    case "Sunday": emp.Domingo = valorTurno; break;
+                    ubiMaestra = new Ubicacion { Nombre = txtNombrePunto.Text.ToUpper(), Latitud = _selectedLat, Longitud = _selectedLng, RadioPermitido = 200 };
+                    DataService.AgregarUbicacion(ubiMaestra);
                 }
+
+                if (_idEmpleadoPreseleccionado > 0)
+                {
+                    TimeSpan hEntrada = DateTime.Parse(txtHoraInicio.Text).TimeOfDay;
+                    TimeSpan hSalida = DateTime.Parse(txtHoraFin.Text).TimeOfDay;
+                    var turno = new Turno { Nombre = "PERSONALIZADO", HoraInicio = hEntrada, HoraFin = hSalida };
+                    DataService.AgregarTurno(turno);
+
+                    DataService.CrearAsignacion(new Asignacion
+                    {
+                        IdEmpleado = _idEmpleadoPreseleccionado,
+                        IdUbicacion = ubiMaestra.Id,
+                        IdTurno = turno.Id,
+                        Fecha = dpFecha.SelectedDate ?? _fechaAsignacion,
+                        Estatus = "PROGRAMADO"
+                    });
+                }
+                DataService.GuardarTodo();
+                this.DialogResult = true;
+                this.Close();
             }
-
-            emp.PuntoServicio = ubi.Nombre;
-
-            // CÁLCULO DE SUELDO 
-            decimal tarifaPorHora = 35.5m;
-            decimal totalHorasSemana = 0;
-
-            string[] diasValores = { emp.Lunes, emp.Martes, emp.Miercoles, emp.Jueves, emp.Viernes, emp.Sabado, emp.Domingo };
-
-            foreach (string valor in diasValores)
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
+        }
+        private void BtnCancelar_Click(object sender, RoutedEventArgs e)
+        {
+            this.DialogResult = false;
+            this.Close();
+        }
+        private void BtnEliminarVarios_Click(object sender, RoutedEventArgs e)
+        {
+            var seleccionados = lstUbicaciones.SelectedItems.Cast<Ubicacion>().ToList();
+            if (seleccionados.Count > 0)
             {
-                if (decimal.TryParse(valor, out decimal horas))
-                {
-                    totalHorasSemana += horas;
-                }
-                else if (valor == "D" || valor == "A")
-                {
-                    totalHorasSemana += 12;
-                }
+                // Eliminación silenciosa (sin MessageBox ruidoso)
+                foreach (var u in seleccionados) DataService.Ubicaciones.Remove(u);
+                DataService.GuardarTodo();
+                RefrescarListaUbicaciones();
             }
+        }
 
-            emp.TotalSueldo = totalHorasSemana * tarifaPorHora;
-
-            DataService.GuardarTodo();
-            MessageBox.Show($"Asignación guardada para {emp.Nombre}. Nómina actualizada.");
-            this.NavigationService.GoBack();
+        private void BtnCancelarSeleccion_Click(object sender, RoutedEventArgs e)
+        {
+            if (lstUbicaciones != null)
+            {
+                lstUbicaciones.UnselectAll();
+            }
         }
     }
 }

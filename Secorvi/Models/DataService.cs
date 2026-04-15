@@ -4,29 +4,36 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Windows;
-// en este codigo se maneja las reglas para usar cada cosa
+
 namespace Secorvi.Models
 {
     public static class DataService
     {
+        // Rutas de archivos JSON (Simulación de tablas de BD)
         private static readonly string baseDir = AppDomain.CurrentDomain.BaseDirectory;
         private static readonly string empPath = Path.Combine(baseDir, "empleados.json");
         private static readonly string ubiPath = Path.Combine(baseDir, "ubicaciones.json");
         private static readonly string asigPath = Path.Combine(baseDir, "asignaciones.json");
-        private static readonly string configPath = Path.Combine(baseDir, "config.json");
+        private static readonly string turnPath = Path.Combine(baseDir, "turnos.json");
+        private static readonly string asistPath = Path.Combine(baseDir, "asistencias.json");
 
+        // Listas en memoria (Cache de datos)
         public static List<Empleado> Empleados { get; set; } = new List<Empleado>();
         public static List<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
         public static List<Asignacion> Asignaciones { get; set; } = new List<Asignacion>();
-        public static decimal TarifaHoraGlobal { get; set; } = 35.5m;
+        public static List<Turno> Turnos { get; set; } = new List<Turno>();
+        public static List<Asistencia> HistorialAsistencias { get; set; } = new List<Asistencia>();
 
-        static DataService() { CargarTodo(); }
+        static DataService()
+        {
+            CargarTodo();
+        }
 
+        #region Persistencia de Datos
         public static void CargarTodo()
         {
             try
             {
-                // Carga de listas principales
                 if (File.Exists(empPath))
                     Empleados = JsonSerializer.Deserialize<List<Empleado>>(File.ReadAllText(empPath)) ?? new List<Empleado>();
 
@@ -36,16 +43,18 @@ namespace Secorvi.Models
                 if (File.Exists(asigPath))
                     Asignaciones = JsonSerializer.Deserialize<List<Asignacion>>(File.ReadAllText(asigPath)) ?? new List<Asignacion>();
 
-                // Carga de configuración (Tarifa)
-                if (File.Exists(configPath))
-                {
-                    var config = JsonSerializer.Deserialize<Dictionary<string, decimal>>(File.ReadAllText(configPath));
-                    if (config != null && config.ContainsKey("Tarifa")) TarifaHoraGlobal = config["Tarifa"];
-                }
+                if (File.Exists(turnPath))
+                    Turnos = JsonSerializer.Deserialize<List<Turno>>(File.ReadAllText(turnPath)) ?? new List<Turno>();
+
+                if (File.Exists(asistPath))
+                    HistorialAsistencias = JsonSerializer.Deserialize<List<Asistencia>>(File.ReadAllText(asistPath)) ?? new List<Asistencia>();
 
                 if (Empleados.Count == 0) CargarSemilla();
             }
-            catch (Exception ex) { MessageBox.Show("Error al cargar datos: " + ex.Message); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error crítico al cargar base de datos local: " + ex.Message);
+            }
         }
 
         public static void GuardarTodo()
@@ -53,80 +62,133 @@ namespace Secorvi.Models
             try
             {
                 var opt = new JsonSerializerOptions { WriteIndented = true };
-
-                // Guardamos todas las entidades para no perder integridad
                 File.WriteAllText(empPath, JsonSerializer.Serialize(Empleados, opt));
                 File.WriteAllText(ubiPath, JsonSerializer.Serialize(Ubicaciones, opt));
                 File.WriteAllText(asigPath, JsonSerializer.Serialize(Asignaciones, opt));
-
-                // Guardar la configuración de la tarifa
-                var config = new Dictionary<string, decimal> { { "Tarifa", TarifaHoraGlobal } };
-                File.WriteAllText(configPath, JsonSerializer.Serialize(config, opt));
+                File.WriteAllText(turnPath, JsonSerializer.Serialize(Turnos, opt));
+                File.WriteAllText(asistPath, JsonSerializer.Serialize(HistorialAsistencias, opt));
             }
-            catch (Exception ex) { MessageBox.Show("Error al guardar: " + ex.Message); }
+            catch (Exception ex) { MessageBox.Show("Error al guardar persistencia: " + ex.Message); }
         }
+        #endregion
 
-        public static decimal CalcularSueldoEmpleado(Empleado emp)
+        #region Lógica de Validación Geofencing (Simulación Bot WhatsApp)
+        public static bool ValidarEntradaEmpleado(string matricula, double latEnviada, double lonEnviada)
         {
-            decimal totalHorasSemana = 0;
-            string[] diasValores = { emp.Lunes, emp.Martes, emp.Miercoles, emp.Jueves, emp.Viernes, emp.Sabado, emp.Domingo };
+            var emp = Empleados.FirstOrDefault(e => e.Matricula == matricula);
+            if (emp == null) return false;
 
-            foreach (string valor in diasValores)
+            // Busca asignación activa para el día de hoy
+            var hoy = DateTime.Today;
+            var asignacion = Asignaciones.FirstOrDefault(a => a.IdEmpleado == emp.Id && a.Fecha.Date == hoy);
+
+            if (asignacion == null) return false;
+
+            // Obtiene los datos geográficos del lugar asignado
+            var ubi = Ubicaciones.FirstOrDefault(u => u.Id == asignacion.IdUbicacion);
+            if (ubi == null) return false;
+
+            // Cálculo de distancia real
+            double distancia = CalcularDistanciaMetros(latEnviada, lonEnviada, ubi.Latitud, ubi.Longitud);
+            bool cumpleDistancia = distancia <= ubi.RadioPermitido;
+
+            // Registro del evento en la tabla Asistencia
+            var registro = new Asistencia
             {
-                if (string.IsNullOrEmpty(valor)) continue;
+                Id = HistorialAsistencias.Count > 0 ? HistorialAsistencias.Max(a => a.Id) + 1 : 1,
+                IdEmpleado = emp.Id,
+                FechaHora = DateTime.Now,
+                LatitudRecibida = latEnviada,
+                LongitudRecibida = lonEnviada,
+                DentroDeRango = cumpleDistancia,
+                Incidencias = cumpleDistancia ? "ASISTENCIA CORRECTA" : $"FUERA DE RANGO ({Math.Round(distancia)}m)"
+            };
 
-                if (decimal.TryParse(valor, out decimal horas))
-                {
-                    totalHorasSemana += horas;
-                }
-                else if (valor == "D" || valor == "A")
-                {
-                    totalHorasSemana += 12;
-                }
-            }
-            return totalHorasSemana * TarifaHoraGlobal;
-        }
-
-        private static void CargarSemilla()
-        {
-            Empleados.Add(new Empleado { Id = 1, Matricula = "SEC-2001", Nombre = "AGENTE DE PRUEBA", Telefono = "8110000000", TotalSueldo = 0 });
+            HistorialAsistencias.Add(registro);
             GuardarTodo();
+
+            return cumpleDistancia;
         }
 
-        public static List<Empleado> CargarEmpleados() => Empleados;
+        private static double CalcularDistanciaMetros(double lat1, double lon1, double lat2, double lon2)
+        {
+            double R = 6371000; // Radio de la tierra en metros
+            double dLat = (lat2 - lat1) * Math.PI / 180;
+            double dLon = (lon2 - lon1) * Math.PI / 180;
+            double a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                       Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) *
+                       Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+            double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            return R * c;
+        }
+        #endregion
 
+        #region Gestión de Entidades
         public static void GuardarNuevoEmpleado(Empleado nuevo)
         {
-            int proximoId = Empleados.Count > 0 ? Empleados.Max(e => e.Id) + 1 : 1;
-            nuevo.Id = proximoId;
+            nuevo.Id = Empleados.Count > 0 ? Empleados.Max(e => e.Id) + 1 : 1;
             Empleados.Add(nuevo);
             GuardarTodo();
         }
 
-        public static void EliminarEmpleado(string matricula)
+        public static void EliminarEmpleado(int idEmpleado)
         {
-            var emp = Empleados.FirstOrDefault(x => x.Matricula == matricula);
-            if (emp != null) { Empleados.Remove(emp); GuardarTodo(); }
-        }
-
-        public static void AsignarDiaLibre(string matricula, string diaSemana)
-        {
-            var emp = Empleados.FirstOrDefault(x => x.Matricula == matricula);
-            if (emp != null)
+            var emp = Empleados.FirstOrDefault(x => x.Id == idEmpleado);
+            if (emp != null && !emp.EsSuperAdmin)
             {
-                string dia = diaSemana.ToLower().Replace("é", "e").Replace("á", "a");
-                switch (dia)
-                {
-                    case "lunes": emp.Lunes = "LIBRE"; break;
-                    case "martes": emp.Martes = "LIBRE"; break;
-                    case "miercoles": emp.Miercoles = "LIBRE"; break;
-                    case "jueves": emp.Jueves = "LIBRE"; break;
-                    case "viernes": emp.Viernes = "LIBRE"; break;
-                    case "sabado": emp.Sabado = "LIBRE"; break;
-                    case "domingo": emp.Domingo = "LIBRE"; break;
-                }
+                Empleados.Remove(emp);
+                // Limpieza de cascada manual para el simulador JSON
+                Asignaciones.RemoveAll(a => a.IdEmpleado == idEmpleado);
                 GuardarTodo();
             }
+        }
+
+        public static void AgregarUbicacion(Ubicacion nueva)
+        {
+            nueva.Id = Ubicaciones.Count > 0 ? Ubicaciones.Max(u => u.Id) + 1 : 1;
+            Ubicaciones.Add(nueva);
+            GuardarTodo();
+        }
+
+        public static void AgregarTurno(Turno nuevo)
+        {
+            nuevo.Id = Turnos.Count > 0 ? Turnos.Max(t => t.Id) + 1 : 1;
+            Turnos.Add(nuevo);
+            GuardarTodo();
+        }
+
+        public static void CrearAsignacion(Asignacion nueva)
+        {
+            nueva.Id = Asignaciones.Count > 0 ? Asignaciones.Max(a => a.Id) + 1 : 1;
+            Asignaciones.Add(nueva);
+            GuardarTodo();
+        }
+        #endregion
+
+        private static void CargarSemilla()
+        {
+            // Admin por defecto
+            if (!Empleados.Any())
+            {
+                Empleados.Add(new Empleado
+                {
+                    Id = 1,
+                    Matricula = "SEC-001",
+                    Nombre = "Rommel",
+                    Password = "1234",
+                    EsAdmin = true,
+                    EsSuperAdmin = true,
+                    TurnoTipo = "ADMIN"
+                });
+            }
+
+            // Agregar una ubicación de prueba si no hay
+            if (!Ubicaciones.Any())
+            {
+                Ubicaciones.Add(new Ubicacion { Id = 1, Nombre = "Oficina Central", Latitud = 25.6866, Longitud = -100.3161, RadioPermitido = 100 });
+            }
+
+            GuardarTodo();
         }
     }
 }

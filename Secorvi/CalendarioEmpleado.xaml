@@ -1,0 +1,201 @@
+﻿<Page x:Class="Secorvi.CalendarioEmpleado"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="#0B0D12" Language="es-MX"
+      Title="Calendario de Agente">
+
+    <Page.Resources>
+        <SolidColorBrush x:Key="PrimaryYellow" Color="#FFB300"/>
+        <SolidColorBrush x:Key="DeepPanel" Color="#161920"/>
+        <SolidColorBrush x:Key="BorderGray" Color="#2D323E"/>
+        <SolidColorBrush x:Key="TextMuted" Color="#6B7280"/>
+
+        <Style x:Key="StatCard" TargetType="Border">
+            <Setter Property="Background" Value="#161920"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="15"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="BorderBrush" Value="#2D323E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="#3498DB"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="HeaderButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#2C3E50"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#34495E"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="BackButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#1A1F26"/>
+            <Setter Property="Foreground" Value="#FFB300"/>
+            <Setter Property="BorderBrush" Value="#2D323E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="Margin" Value="0,0,15,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FFB300"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background" Value="#161920"/>
+            <Setter Property="BorderBrush" Value="#3498DB"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="4">
+                            <StackPanel IsItemsHost="True" Margin="2"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="MenuItem">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="Border" Background="Transparent" BorderThickness="3,0,0,0" BorderBrush="Transparent" Margin="0,1">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="30"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter x:Name="Icon" ContentSource="Icon" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <ContentPresenter Grid.Column="1" ContentSource="Header" Margin="10,0,20,0" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#1E252F"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#3498DB"/>
+                                <Setter Property="Foreground" Value="#3498DB"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Row="0" Grid.ColumnSpan="2" Style="{StaticResource StatCard}" Padding="12" Margin="0,0,0,15">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <Button Content="◀ VOLVER" Click="BtnVolver_Click" Style="{StaticResource BackButtonStyle}" FontWeight="Bold" FontSize="10"/>
+                    <Rectangle Width="1" Height="25" Fill="{StaticResource BorderGray}" Margin="5,0,15,0"/>
+                    <TextBlock x:Name="lblNombreEmpleado" Foreground="{StaticResource PrimaryYellow}" FontSize="24" FontWeight="Bold" VerticalAlignment="Center" Text="ALAN ELIZ"/>
+                    <TextBlock x:Name="lblFechaHoraActual" Margin="15,0,0,0" Foreground="White" FontSize="14" VerticalAlignment="Center" Opacity="0.4" Text="| 15 DE ABRIL | 12:00 AM"/>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="◀" Width="40" Height="32" Style="{StaticResource HeaderButtonStyle}" Click="BtnSemanaAtras_Click" Margin="0,0,5,0"/>
+                    <DatePicker x:Name="dpSaltoFecha" Width="130" Height="32" VerticalAlignment="Center" SelectedDateChanged="DpSaltoFecha_SelectedDateChanged" />
+                    <Button Content="▶" Width="40" Height="32" Style="{StaticResource HeaderButtonStyle}" Click="BtnSemanaAdelante_Click" Margin="5,0,15,0"/>
+
+                    <Button Content="📍 ASIGNAR SERVICIO" Click="BtnAsignarHorario_Click" Background="{StaticResource PrimaryYellow}" Foreground="Black" FontWeight="Bold" Padding="20,8" BorderThickness="0" Cursor="Hand" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,15,0">
+            <TextBlock Text="MÉTRICAS SEMANALES" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Bold" Margin="5,0,0,8" />
+            <Border Style="{StaticResource StatCard}">
+                <StackPanel>
+                    <TextBlock Text="SERVICIOS ACTIVOS" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Bold"/>
+                    <TextBlock x:Name="lblTotalServicios" Text="0" Foreground="#3498DB" FontSize="32" FontWeight="Bold"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource StatCard}">
+                <StackPanel>
+                    <TextBlock Text="DESCANSOS / VAC." Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Bold"/>
+                    <TextBlock x:Name="lblTotalDescansos" Text="0 DÍAS" Foreground="#95A5A6" FontSize="32" FontWeight="Bold"/>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="GUÍA TÁCTICA" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Bold" Margin="5,15,0,8" />
+            <Border Background="#0F111A" CornerRadius="8" Padding="15" BorderBrush="{StaticResource BorderGray}" BorderThickness="1">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <Ellipse Width="8" Height="8" Fill="#3498DB" Margin="0,0,10,0"/>
+                        <TextBlock Text="ARRASTRAR: Selección" Foreground="White" FontSize="10"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource PrimaryYellow}" Margin="0,0,10,0"/>
+                        <TextBlock Text="1-CLICK: Menú Táctico" Foreground="White" FontSize="10"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="8" Height="8" Fill="#E74C3C" Margin="0,0,10,0"/>
+                        <TextBlock Text="SHIFT+CLICK: Borrado" Foreground="White" FontSize="10"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <Grid Grid.Row="1" Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Background="#1E252F" CornerRadius="6" Padding="12" Margin="0,0,0,12" BorderBrush="{StaticResource BorderGray}" BorderThickness="1">
+                <TextBlock x:Name="lblRangoSemana" Foreground="#3498DB" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" Text="RANGO DE FECHAS"/>
+            </Border>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Background="#0F111A">
+                <Grid x:Name="GridCalendario" ShowGridLines="False"/>
+            </ScrollViewer>
+        </Grid>
+
+        <Border Grid.Row="2" Grid.ColumnSpan="2" Background="#161920" CornerRadius="8" Padding="12" Margin="0,15,0,0" BorderBrush="{StaticResource BorderGray}" BorderThickness="1">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse Width="8" Height="8" Fill="#2ECC71" Margin="0,0,10,0"/>
+                    <TextBlock x:Name="lblStatus" Text="COMMAND CENTER ONLINE" Foreground="#2ECC71" FontSize="10" FontWeight="Bold"/>
+                </StackPanel>
+                <TextBlock Text="SECORVI MONITORING SYSTEM v2.0" Foreground="{StaticResource TextMuted}" FontSize="9" FontWeight="Bold" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Page>
