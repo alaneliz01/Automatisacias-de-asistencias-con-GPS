@@ -18,6 +18,7 @@ namespace Secorvi
         public ContenedorPrincipal()
         {
             InitializeComponent();
+            MainFrame.Navigate(new PanelDeControl());
         }
     }
 }

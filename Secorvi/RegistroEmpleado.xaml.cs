@@ -2,77 +2,70 @@
 using System;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Navigation;
 
 namespace Secorvi
 {
-    public partial class RegistroEmpleado : Window
+    public partial class RegistroEmpleado : Page
     {
         public RegistroEmpleado()
         {
             InitializeComponent();
-
-            // Tony: Generamos una sugerencia de matrícula basada en el tiempo actual
-            // Esto evita que el usuario tenga que inventar una cada vez.
-            txtMatricula.Text = "SEC-" + DateTime.Now.ToString("yyyyMMddHHss").Substring(8);
+            // Genera matrícula automática basada en tiempo real
+            txtMatricula.Text = "SEC-" + DateTime.Now.ToString("HHmmss");
         }
 
         private void BtnGuardar_Click(object sender, RoutedEventArgs e)
         {
-            // 1. Validaciones de campos obligatorios
+            // 1. Validación de campos obligatorios
             if (string.IsNullOrWhiteSpace(txtNombre.Text) ||
-                string.IsNullOrWhiteSpace(txtTelefono.Text) ||
-                string.IsNullOrWhiteSpace(txtMatricula.Text) ||
-                string.IsNullOrWhiteSpace(txtPass.Password)) // Asumo que tienes un PasswordBox llamado txtPass
+                string.IsNullOrWhiteSpace(txtApellido.Text) ||
+                string.IsNullOrWhiteSpace(txtPass.Password))
             {
-                MessageBox.Show("Todos los campos, incluyendo la contraseña, son obligatorios.", "Datos Incompletos");
+                MessageBox.Show("SISTEMA: Complete todos los campos antes de continuar.");
                 return;
             }
-
-            string matriculaNueva = txtMatricula.Text.Trim().ToUpper();
-
-            // 2. Validación de Integridad: Evitar matrículas duplicadas
-            bool existe = DataService.Empleados.Any(emp => emp.Matricula == matriculaNueva);
-            if (existe)
-            {
-                MessageBox.Show("La matrícula ingresada ya pertenece a otro agente.", "Error de Duplicidad");
-                return;
-            }
-
-            // 3. Crear el objeto con la estructura normalizada
-            Empleado nuevo = new Empleado
-            {
-                Matricula = matriculaNueva,
-                Nombre = txtNombre.Text.Trim().ToUpper(),
-                Telefono = txtTelefono.Text.Trim(),
-                Password = txtPass.Password, // Contraseña inicial para acceso o validación futura
-
-                // Tony: Valores iniciales por defecto
-                PuntoServicio = "PENDIENTE",
-                TurnoTipo = "OPERATIVO",
-                EsAdmin = false,
-                EsSuperAdmin = false,
-                ColorStatus = "#4B5563" // Gris inicial (Sin reporte)
-            };
 
             try
             {
-                // 4. Guardar a través del servicio persistente
-                DataService.GuardarNuevoEmpleado(nuevo);
+                // 2. Crear el objeto con los datos del formulario
+                var nuevoEmpleado = new Empleado
+                {
+                    Nombre = txtNombre.Text.ToUpper(),
+                    Apellido = txtApellido.Text.ToUpper(),
+                    Matricula = txtMatricula.Text,
+                    Telefono = txtTelefono.Text,
+                    Usuario = txtNombre.Text.Split(' ')[0].ToLower() + DateTime.Now.Second.ToString(),
+                    Contrasena = txtPass.Password,
+                    EsAdmin = false,
+                    Activo = true
+                };
 
-                // Tony: Indicamos al Panel de Control que la operación fue exitosa para que refresque la lista
-                this.DialogResult = true;
-                this.Close();
+                // 3. Guardar en MySQL a través del DataService
+                DataService.AgregarEmpleado(nuevoEmpleado);
+
+                MessageBox.Show("AGENTE REGISTRADO EXITOSAMENTE", "OPERACIÓN TÁCTICA");
+
+                // 4. NAVEGACIÓN (Correcto para una Page)
+                if (NavigationService.CanGoBack)
+                {
+                    NavigationService.GoBack();
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error técnico al guardar en el JSON: {ex.Message}", "Error Crítico");
+                MessageBox.Show("ERROR AL REGISTRAR: " + ex.Message, "FALLO DE SISTEMA");
             }
         }
 
         private void BtnCancelar_Click(object sender, RoutedEventArgs e)
         {
-            this.DialogResult = false;
-            this.Close();
+            // Regresar al Panel de Control sin guardar
+            if (this.NavigationService != null && this.NavigationService.CanGoBack)
+            {
+                this.NavigationService.GoBack();
+            }
         }
     }
 }

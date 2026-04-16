@@ -8,7 +8,8 @@ namespace Secorvi.Models
         public int IdEmpleado { get; set; }
         public int IdUbicacion { get; set; }
         public int IdTurno { get; set; }
+
         public DateTime Fecha { get; set; }
-        public string Estatus { get; set; } // Programado, Realizado, Incidencia
+        public string Estatus { get; set; }
     }
 }

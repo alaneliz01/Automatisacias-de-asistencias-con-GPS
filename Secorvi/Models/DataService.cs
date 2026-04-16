@@ -1,194 +1,290 @@
-﻿using System;
+﻿using MySql.Data.MySqlClient;
+using Secorvi.Models;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Windows;
+using System.Globalization;
 
-namespace Secorvi.Models
+namespace Secorvi
 {
     public static class DataService
     {
-        // Rutas de archivos JSON (Simulación de tablas de BD)
-        private static readonly string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-        private static readonly string empPath = Path.Combine(baseDir, "empleados.json");
-        private static readonly string ubiPath = Path.Combine(baseDir, "ubicaciones.json");
-        private static readonly string asigPath = Path.Combine(baseDir, "asignaciones.json");
-        private static readonly string turnPath = Path.Combine(baseDir, "turnos.json");
-        private static readonly string asistPath = Path.Combine(baseDir, "asistencias.json");
+        private static string connectionString = "Server=localhost;Database=secorvi_db;Uid=root;Pwd=2037888;AllowPublicKeyRetrieval=true;";
 
-        // Listas en memoria (Cache de datos)
         public static List<Empleado> Empleados { get; set; } = new List<Empleado>();
         public static List<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
-        public static List<Asignacion> Asignaciones { get; set; } = new List<Asignacion>();
         public static List<Turno> Turnos { get; set; } = new List<Turno>();
-        public static List<Asistencia> HistorialAsistencias { get; set; } = new List<Asistencia>();
+        public static List<Asignacion> Asignaciones { get; set; } = new List<Asignacion>();
 
-        static DataService()
-        {
-            CargarTodo();
-        }
+        public static void GuardarTodo() => ActualizarTodo();
 
-        #region Persistencia de Datos
-        public static void CargarTodo()
+        public static void ActualizarTodo()
         {
             try
             {
-                if (File.Exists(empPath))
-                    Empleados = JsonSerializer.Deserialize<List<Empleado>>(File.ReadAllText(empPath)) ?? new List<Empleado>();
-
-                if (File.Exists(ubiPath))
-                    Ubicaciones = JsonSerializer.Deserialize<List<Ubicacion>>(File.ReadAllText(ubiPath)) ?? new List<Ubicacion>();
-
-                if (File.Exists(asigPath))
-                    Asignaciones = JsonSerializer.Deserialize<List<Asignacion>>(File.ReadAllText(asigPath)) ?? new List<Asignacion>();
-
-                if (File.Exists(turnPath))
-                    Turnos = JsonSerializer.Deserialize<List<Turno>>(File.ReadAllText(turnPath)) ?? new List<Turno>();
-
-                if (File.Exists(asistPath))
-                    HistorialAsistencias = JsonSerializer.Deserialize<List<Asistencia>>(File.ReadAllText(asistPath)) ?? new List<Asistencia>();
-
-                if (Empleados.Count == 0) CargarSemilla();
+                CargarEmpleados();
+                CargarUbicaciones();
+                CargarTurnos();
+                VerificarEstadosEspeciales();
+                CargarAsignaciones();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error crítico al cargar base de datos local: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("Sync Error: " + ex.Message);
             }
         }
 
-        public static void GuardarTodo()
+        private static void VerificarEstadosEspeciales()
         {
-            try
+            CrearTurnoSistemaSiNoExiste("VACACIONES");
+            CrearTurnoSistemaSiNoExiste("DÍA LIBRE");
+        }
+
+        private static void CrearTurnoSistemaSiNoExiste(string nombreEstado)
+        {
+            if (!Turnos.Any(t => t.Nombre.Equals(nombreEstado, StringComparison.OrdinalIgnoreCase)))
             {
-                var opt = new JsonSerializerOptions { WriteIndented = true };
-                File.WriteAllText(empPath, JsonSerializer.Serialize(Empleados, opt));
-                File.WriteAllText(ubiPath, JsonSerializer.Serialize(Ubicaciones, opt));
-                File.WriteAllText(asigPath, JsonSerializer.Serialize(Asignaciones, opt));
-                File.WriteAllText(turnPath, JsonSerializer.Serialize(Turnos, opt));
-                File.WriteAllText(asistPath, JsonSerializer.Serialize(HistorialAsistencias, opt));
-            }
-            catch (Exception ex) { MessageBox.Show("Error al guardar persistencia: " + ex.Message); }
-        }
-        #endregion
-
-        #region Lógica de Validación Geofencing (Simulación Bot WhatsApp)
-        public static bool ValidarEntradaEmpleado(string matricula, double latEnviada, double lonEnviada)
-        {
-            var emp = Empleados.FirstOrDefault(e => e.Matricula == matricula);
-            if (emp == null) return false;
-
-            // Busca asignación activa para el día de hoy
-            var hoy = DateTime.Today;
-            var asignacion = Asignaciones.FirstOrDefault(a => a.IdEmpleado == emp.Id && a.Fecha.Date == hoy);
-
-            if (asignacion == null) return false;
-
-            // Obtiene los datos geográficos del lugar asignado
-            var ubi = Ubicaciones.FirstOrDefault(u => u.Id == asignacion.IdUbicacion);
-            if (ubi == null) return false;
-
-            // Cálculo de distancia real
-            double distancia = CalcularDistanciaMetros(latEnviada, lonEnviada, ubi.Latitud, ubi.Longitud);
-            bool cumpleDistancia = distancia <= ubi.RadioPermitido;
-
-            // Registro del evento en la tabla Asistencia
-            var registro = new Asistencia
-            {
-                Id = HistorialAsistencias.Count > 0 ? HistorialAsistencias.Max(a => a.Id) + 1 : 1,
-                IdEmpleado = emp.Id,
-                FechaHora = DateTime.Now,
-                LatitudRecibida = latEnviada,
-                LongitudRecibida = lonEnviada,
-                DentroDeRango = cumpleDistancia,
-                Incidencias = cumpleDistancia ? "ASISTENCIA CORRECTA" : $"FUERA DE RANGO ({Math.Round(distancia)}m)"
-            };
-
-            HistorialAsistencias.Add(registro);
-            GuardarTodo();
-
-            return cumpleDistancia;
-        }
-
-        private static double CalcularDistanciaMetros(double lat1, double lon1, double lat2, double lon2)
-        {
-            double R = 6371000; // Radio de la tierra en metros
-            double dLat = (lat2 - lat1) * Math.PI / 180;
-            double dLon = (lon2 - lon1) * Math.PI / 180;
-            double a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
-                       Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) *
-                       Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-            double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-            return R * c;
-        }
-        #endregion
-
-        #region Gestión de Entidades
-        public static void GuardarNuevoEmpleado(Empleado nuevo)
-        {
-            nuevo.Id = Empleados.Count > 0 ? Empleados.Max(e => e.Id) + 1 : 1;
-            Empleados.Add(nuevo);
-            GuardarTodo();
-        }
-
-        public static void EliminarEmpleado(int idEmpleado)
-        {
-            var emp = Empleados.FirstOrDefault(x => x.Id == idEmpleado);
-            if (emp != null && !emp.EsSuperAdmin)
-            {
-                Empleados.Remove(emp);
-                // Limpieza de cascada manual para el simulador JSON
-                Asignaciones.RemoveAll(a => a.IdEmpleado == idEmpleado);
-                GuardarTodo();
-            }
-        }
-
-        public static void AgregarUbicacion(Ubicacion nueva)
-        {
-            nueva.Id = Ubicaciones.Count > 0 ? Ubicaciones.Max(u => u.Id) + 1 : 1;
-            Ubicaciones.Add(nueva);
-            GuardarTodo();
-        }
-
-        public static void AgregarTurno(Turno nuevo)
-        {
-            nuevo.Id = Turnos.Count > 0 ? Turnos.Max(t => t.Id) + 1 : 1;
-            Turnos.Add(nuevo);
-            GuardarTodo();
-        }
-
-        public static void CrearAsignacion(Asignacion nueva)
-        {
-            nueva.Id = Asignaciones.Count > 0 ? Asignaciones.Max(a => a.Id) + 1 : 1;
-            Asignaciones.Add(nueva);
-            GuardarTodo();
-        }
-        #endregion
-
-        private static void CargarSemilla()
-        {
-            // Admin por defecto
-            if (!Empleados.Any())
-            {
-                Empleados.Add(new Empleado
+                Turno nuevo = new Turno
                 {
-                    Id = 1,
-                    Matricula = "SEC-001",
-                    Nombre = "Rommel",
-                    Password = "1234",
-                    EsAdmin = true,
-                    EsSuperAdmin = true,
-                    TurnoTipo = "ADMIN"
-                });
+                    Nombre = nombreEstado,
+                    HoraInicio = new TimeSpan(0, 0, 0),
+                    HoraFin = new TimeSpan(23, 59, 59)
+                };
+                AgregarTurno(nuevo);
             }
+        }
 
-            // Agregar una ubicación de prueba si no hay
-            if (!Ubicaciones.Any())
+        // --- GESTIÓN DE EMPLEADOS ---
+        public static void CargarEmpleados()
+        {
+            Empleados.Clear();
+            using (var conn = new MySqlConnection(connectionString))
             {
-                Ubicaciones.Add(new Ubicacion { Id = 1, Nombre = "Oficina Central", Latitud = 25.6866, Longitud = -100.3161, RadioPermitido = 100 });
+                try
+                {
+                    conn.Open();
+                    var cmd = new MySqlCommand("SELECT * FROM empleados WHERE activo = 1", conn);
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        while (r.Read())
+                        {
+                            Empleados.Add(new Empleado
+                            {
+                                Id = r["id"] != DBNull.Value ? Convert.ToInt32(r["id"]) : 0,
+                                Nombre = r["nombre"]?.ToString() ?? "",
+                                Apellido = r["apellido"]?.ToString() ?? "",
+                                Matricula = r["matricula"]?.ToString() ?? "",
+                                Telefono = r["telefono"]?.ToString() ?? "",
+                                Usuario = r["usuario"]?.ToString()?.Trim() ?? "",
+                                Contrasena = r["contrasena"]?.ToString()?.Trim() ?? "",
+                                EsAdmin = r["es_admin"] != DBNull.Value && Convert.ToBoolean(r["es_admin"]),
+                                Activo = r["activo"] != DBNull.Value && Convert.ToBoolean(r["activo"])
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex.Message); }
             }
+        }
 
-            GuardarTodo();
+        public static void AgregarEmpleado(Empleado emp)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                string query = "INSERT INTO empleados (nombre, apellido, matricula, telefono, usuario, contrasena, es_admin, activo) VALUES (@nom, @ape, @mat, @tel, @usu, @con, @adm, 1)";
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@nom", emp.Nombre);
+                cmd.Parameters.AddWithValue("@ape", emp.Apellido);
+                cmd.Parameters.AddWithValue("@mat", emp.Matricula);
+                cmd.Parameters.AddWithValue("@tel", emp.Telefono);
+                cmd.Parameters.AddWithValue("@usu", emp.Usuario);
+                cmd.Parameters.AddWithValue("@con", emp.Contrasena);
+                cmd.Parameters.AddWithValue("@adm", emp.EsAdmin);
+                conn.Open();
+                cmd.ExecuteNonQuery();
+            }
+            CargarEmpleados();
+        }
+
+        public static void EliminarEmpleado(int id)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                string query = "UPDATE empleados SET activo = 0 WHERE id = @id";
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@id", id);
+                conn.Open();
+                cmd.ExecuteNonQuery();
+            }
+            CargarEmpleados();
+        }
+
+        public static void CambiarPermisos(int id, bool esAdmin)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                string query = "UPDATE empleados SET es_admin = @adm WHERE id = @id";
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@adm", esAdmin);
+                cmd.Parameters.AddWithValue("@id", id);
+                conn.Open();
+                cmd.ExecuteNonQuery();
+            }
+            CargarEmpleados();
+        }
+
+        // --- GESTIÓN DE UBICACIONES ---
+        public static void CargarUbicaciones()
+        {
+            Ubicaciones.Clear();
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                try
+                {
+                    conn.Open();
+                    var cmd = new MySqlCommand("SELECT * FROM ubicaciones", conn);
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        while (r.Read())
+                        {
+                            Ubicaciones.Add(new Ubicacion
+                            {
+                                Id = Convert.ToInt32(r["id"]),
+                                Nombre = r["nombre"]?.ToString(),
+                                Latitud = Convert.ToDouble(r["latitud"]),
+                                Longitud = Convert.ToDouble(r["longitud"]),
+                                RadioPermitido = Convert.ToDouble(r["radio_permitido"]),
+                                Activo = Convert.ToBoolean(r["activo"])
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex.Message); }
+            }
+        }
+
+        public static void AgregarUbicacion(Ubicacion u)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                string query = "INSERT INTO ubicaciones (nombre, latitud, longitud, radio_permitido, activo) VALUES (@nom, @lat, @lng, @rad, 1)";
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@nom", u.Nombre);
+                cmd.Parameters.AddWithValue("@lat", u.Latitud);
+                cmd.Parameters.AddWithValue("@lng", u.Longitud);
+                cmd.Parameters.AddWithValue("@rad", u.RadioPermitido);
+                conn.Open();
+                cmd.ExecuteNonQuery();
+            }
+            CargarUbicaciones();
+        }
+
+        // --- GESTIÓN DE TURNOS ---
+        public static void CargarTurnos()
+        {
+            Turnos.Clear();
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                try
+                {
+                    conn.Open();
+                    var cmd = new MySqlCommand("SELECT * FROM turnos", conn);
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        while (r.Read())
+                        {
+                            Turnos.Add(new Turno
+                            {
+                                Id = Convert.ToInt32(r["id"]),
+                                Nombre = r["nombre"].ToString(),
+                                HoraInicio = (TimeSpan)r["hora_inicio"],
+                                HoraFin = (TimeSpan)r["hora_fin"]
+                            });
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+
+        public static void AgregarTurno(Turno t)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                string query = "INSERT INTO turnos (nombre, hora_inicio, hora_fin) VALUES (@nom, @ini, @fin)";
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@nom", t.Nombre);
+                cmd.Parameters.AddWithValue("@ini", t.HoraInicio);
+                cmd.Parameters.AddWithValue("@fin", t.HoraFin);
+                conn.Open();
+                cmd.ExecuteNonQuery();
+            }
+            CargarTurnos();
+        }
+
+        // --- GESTIÓN DE ASIGNACIONES ---
+        public static void CargarAsignaciones()
+        {
+            Asignaciones.Clear();
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                try
+                {
+                    conn.Open();
+                    var cmd = new MySqlCommand("SELECT * FROM asignaciones", conn);
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        while (r.Read())
+                        {
+                            Asignaciones.Add(new Asignacion
+                            {
+                                Id = Convert.ToInt32(r["id"]),
+                                IdEmpleado = Convert.ToInt32(r["id_empleado"]),
+                                IdUbicacion = r["id_ubicacion"] != DBNull.Value ? Convert.ToInt32(r["id_ubicacion"]) : 0,
+                                IdTurno = Convert.ToInt32(r["id_turno"]),
+                                Fecha = Convert.ToDateTime(r["fecha"]),
+                                Estatus = r["estatus"]?.ToString() ?? "PENDIENTE"
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Error al cargar asignaciones: " + ex.Message);
+                }
+            }
+        }
+
+        public static void CrearAsignacion(Asignacion a)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                string query = "INSERT INTO asignaciones (id_empleado, id_ubicacion, id_turno, fecha, estatus) VALUES (@emp, @ubi, @tur, @fec, @est)";
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@emp", a.IdEmpleado);
+                cmd.Parameters.AddWithValue("@ubi", a.IdUbicacion == 0 ? (object)DBNull.Value : a.IdUbicacion);
+                cmd.Parameters.AddWithValue("@tur", a.IdTurno);
+                cmd.Parameters.AddWithValue("@fec", a.Fecha);
+                cmd.Parameters.AddWithValue("@est", a.Estatus);
+                conn.Open();
+                cmd.ExecuteNonQuery();
+            }
+            CargarAsignaciones();
+        }
+
+        public static void EliminarAsignacionPorFecha(int idEmpleado, DateTime fecha)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                string query = "DELETE FROM asignaciones WHERE id_empleado = @emp AND DATE(fecha) = DATE(@fec)";
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@emp", idEmpleado);
+                cmd.Parameters.AddWithValue("@fec", fecha);
+                conn.Open();
+                cmd.ExecuteNonQuery();
+            }
+            CargarAsignaciones();
         }
     }
 }

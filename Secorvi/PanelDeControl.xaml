@@ -112,9 +112,9 @@
                     <DataGridTextColumn Header="MATRÍCULA" Binding="{Binding Matricula}" Width="110">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Foreground" Value="#FFB300"/>
                                 <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="TextAlignment" Value="Center"/>
                                 <Setter Property="FontWeight" Value="Bold"/>
                                 <Setter Property="FontFamily" Value="Consolas"/>
                             </Style>
@@ -124,24 +124,15 @@
                     <DataGridTemplateColumn Header="RANGO" Width="110">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Border x:Name="brdRango" Background="#0F111A" BorderThickness="1" CornerRadius="2" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Border x:Name="brdRango" Background="#0F111A" BorderThickness="1" CornerRadius="2" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Center" BorderBrush="#4B5563">
                                     <TextBlock x:Name="txtRango" Text="AGENTE" Foreground="#4B5563" FontSize="9" FontWeight="Black" FontFamily="Consolas"/>
                                 </Border>
                                 <DataTemplate.Triggers>
-                                    <DataTrigger Binding="{Binding EsSuperAdmin}" Value="True">
-                                        <Setter TargetName="txtRango" Property="Text" Value="MASTER"/>
+                                    <DataTrigger Binding="{Binding EsAdmin}" Value="True">
+                                        <Setter TargetName="txtRango" Property="Text" Value="ADMIN"/>
                                         <Setter TargetName="txtRango" Property="Foreground" Value="#FFB300"/>
                                         <Setter TargetName="brdRango" Property="BorderBrush" Value="#FFB300"/>
                                     </DataTrigger>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding EsAdmin}" Value="True"/>
-                                            <Condition Binding="{Binding EsSuperAdmin}" Value="False"/>
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter TargetName="txtRango" Property="Text" Value="ADMIN"/>
-                                        <Setter TargetName="txtRango" Property="Foreground" Value="#3498DB"/>
-                                        <Setter TargetName="brdRango" Property="BorderBrush" Value="#3498DB"/>
-                                    </MultiDataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>

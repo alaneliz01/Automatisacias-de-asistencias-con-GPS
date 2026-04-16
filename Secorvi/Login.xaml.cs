@@ -1,9 +1,8 @@
-﻿using System;
+﻿using Secorvi.Models;
+using System;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
-using Secorvi.Models;
 
 namespace Secorvi
 {
@@ -12,60 +11,85 @@ namespace Secorvi
         public Login()
         {
             InitializeComponent();
-            // Aseguramos carga de datos al iniciar
-            DataService.CargarTodo();
+            InicializarDatos();
         }
 
-        private async void BtnLogin_Click(object sender, RoutedEventArgs e)
+        private void InicializarDatos()
         {
-            string usuarioInput = txtUser.Text.Trim();
-            string passwordInput = txtPass.Password;
-
-            if (string.IsNullOrWhiteSpace(usuarioInput) || string.IsNullOrWhiteSpace(passwordInput))
+            try
             {
-                MostrarAviso("INGRESE SUS CREDENCIALES", "#5A5A27", "#FFFF88");
+                // Cargamos todo desde MySQL al arrancar
+                DataService.ActualizarTodo();
+
+                if (DataService.Empleados.Count == 0)
+                {
+                    System.Diagnostics.Debug.WriteLine("LOG: La base de datos está vacía o no hay conexión.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Si la conexión a MySQL falla aquí, lo verás en el brdStatus del XAML
+                MostrarAviso("ERROR DE CONEXIÓN: " + ex.Message, "#F8D7DA", "#721C24");
+            }
+        }
+
+        private void BtnLogin_Click(object sender, RoutedEventArgs e)
+        {
+            string userDigitado = txtUser.Text.Trim();
+            string passDigitada = txtPass.Password.Trim();
+
+            if (string.IsNullOrEmpty(userDigitado) || string.IsNullOrEmpty(passDigitada))
+            {
+                MostrarAviso("CRITICAL: Ingrese usuario y contraseña", "#FFF3CD", "#856404");
                 return;
             }
 
-            // Búsqueda en DataService
-            var userLogueado = DataService.Empleados.FirstOrDefault(u =>
-                (u.Nombre.Equals(usuarioInput, StringComparison.OrdinalIgnoreCase) ||
-                 u.Matricula.Equals(usuarioInput, StringComparison.OrdinalIgnoreCase))
-                && u.Password == passwordInput);
+            // IMPORTANTE: Forzamos una recarga antes de buscar para asegurar que 
+            // si acabas de registrar a alguien, ya aparezca aquí.
+            DataService.CargarEmpleados();
 
-            if (userLogueado != null)
+            // Buscamos coincidencia en la lista cargada de MySQL
+            // Usamos .FirstOrDefault() que es más estándar en LINQ
+            var encontrado = DataService.Empleados.FirstOrDefault(x =>
+                x.Usuario.Equals(userDigitado, StringComparison.OrdinalIgnoreCase) &&
+                x.Contrasena == passDigitada);
+
+            if (encontrado != null)
             {
-                if (userLogueado.EsAdmin)
+                if (!encontrado.Activo)
                 {
-                    SesionActual.Usuario = userLogueado;
-                    MostrarAviso($"ACCESO CONCEDIDO - HOLA {userLogueado.Nombre.Split(' ')[0].ToUpper()}", "#2D5A27", "#88FF88");
+                    MostrarAviso("ACCESO DENEGADO: Usuario inactivo", "#F8D7DA", "#721C24");
+                    return;
+                }
 
-                    await Task.Delay(800);
-                    ContenedorPrincipal principal = new ContenedorPrincipal();
-                    principal.Show();
-                    principal.MainFrame.Navigate(new PanelDeControl());
-                    this.Close();
-                }
-                else
-                {
-                    MostrarAviso("ERROR: SIN RANGO DE JEFE", "#5A2727", "#FF8888");
-                }
+                // Guardamos en la clase estática que verificamos antes
+                SesionActual.Usuario = encontrado;
+
+                ContenedorPrincipal principal = new ContenedorPrincipal();
+                principal.Show();
+                this.Close();
             }
             else
             {
-                MostrarAviso("ERROR: CREDENCIALES INCORRECTAS", "#5A2727", "#FF8888");
+                MessageBox.Show($"ACCESO DENEGADO.\nVerifique sus credenciales.\nAgentes en DB: {DataService.Empleados.Count}", "SEGURIDAD SECORVI");
             }
         }
 
         private void MostrarAviso(string mensaje, string colorFondo, string colorTexto)
         {
             var bc = new BrushConverter();
-            brdStatus.Background = (Brush)bc.ConvertFrom(colorFondo);
-            txtStatusMsg.Text = mensaje;
-            txtStatusMsg.Foreground = (Brush)bc.ConvertFrom(colorTexto);
-            brdStatus.Visibility = Visibility.Visible;
+            if (brdStatus != null)
+            {
+                brdStatus.Background = (Brush)bc.ConvertFrom(colorFondo);
+                txtStatusMsg.Text = mensaje.ToUpper();
+                txtStatusMsg.Foreground = (Brush)bc.ConvertFrom(colorTexto);
+                brdStatus.Visibility = Visibility.Visible;
+            }
         }
 
-        private void BtnSalir_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
+        private void BtnSalir_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
+        }
     }
 }

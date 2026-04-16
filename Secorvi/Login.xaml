@@ -72,8 +72,8 @@
                                FontWeight="Bold" FontSize="10" Foreground="#FF5252"/>
                 </Border>
 
-                <Button Content="ACCESS SYSTEM" Style="{StaticResource LoginButtonStyle}"
-                        Height="50" Click="BtnLogin_Click" Margin="0,0,0,15"/>
+                <Button Content="ACCESS SYSTEM" IsDefault="True" Style="{StaticResource LoginButtonStyle}"
+                         Height="50" Click="BtnLogin_Click" Margin="0,0,0,15"/>
 
                 <Button Content="TERMINATE SESSION" Background="Transparent" Foreground="#4B5563" FontSize="10" FontWeight="Bold"
                         BorderThickness="0" Click="BtnSalir_Click" Cursor="Hand" HorizontalAlignment="Center">

@@ -1,152 +1,156 @@
-﻿using System;
+﻿using Secorvi.Models;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
-using Secorvi.Models;
-using Microsoft.VisualBasic;
+using System.Windows.Navigation;
 
 namespace Secorvi
 {
     public partial class PanelDeControl : Page
     {
-        private List<Empleado> _empleadosCache = new List<Empleado>();
-
         public PanelDeControl()
         {
             InitializeComponent();
-            this.Loaded += (s, e) => CargarDatos();
+            // Recargar datos cada vez que la página gane foco o regreses a ella
+            this.Loaded += (s, e) => CargarDatosDesdeDB();
         }
 
-        private void CargarDatos()
-        {
-            _empleadosCache = DataService.Empleados;
-
-            foreach (var emp in _empleadosCache)
-            {
-                var ultimaAsis = DataService.HistorialAsistencias
-                    .Where(a => a.IdEmpleado == emp.Id)
-                    .OrderByDescending(a => a.FechaHora)
-                    .FirstOrDefault();
-
-                if (ultimaAsis != null)
-                {
-                    emp.UltimoReporteHora = $"{ultimaAsis.FechaHora:HH:mm} hrs";
-                    emp.UltimoReporteStatus = ultimaAsis.DentroDeRango ? "DENTRO DE RANGO" : "FUERA DE RANGO";
-                    emp.UltimoReporteUbicacion = ultimaAsis.Incidencias;
-                    emp.ColorStatus = ultimaAsis.DentroDeRango ? "#2ECC71" : "#E74C3C";
-                }
-                else
-                {
-                    emp.UltimoReporteHora = "SIN REPORTE";
-                    emp.UltimoReporteStatus = "PENDIENTE";
-                    emp.UltimoReporteUbicacion = "Esperando señal de n8n...";
-                    emp.ColorStatus = "#4B5563";
-                }
-            }
-
-            FiltrarYMostrar();
-        }
-        
-        private void DgEmpleados_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private void CargarDatosDesdeDB()
         {
             try
             {
-                // Tony: Verificamos que realmente se haya seleccionado un ítem para evitar el error de rango
-                if (dgEmpleados.SelectedItem is Empleado seleccionado)
-                {
-                    if (this.NavigationService != null)
-                    {
-                        this.NavigationService.Navigate(new CalendarioEmpleado(seleccionado));
-                    }
-                }
+                // Forzamos al DataService a ir a MySQL
+                DataService.ActualizarTodo();
+
+                // IMPORTANTE: Limpiar el ItemsSource antes de reasignar
+                dgEmpleados.ItemsSource = null;
+                dgEmpleados.ItemsSource = DataService.Empleados;
+
+                ActualizarContador(DataService.Empleados.Count);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("Error en Doble Clic: " + ex.Message);
+                MessageBox.Show("ERROR AL REFRESCAR PANEL: " + ex.Message, "DB ERROR");
             }
         }
-        private void FiltrarYMostrar()
+
+        private void ActualizarContador(int total)
         {
-            if (txtBusqueda == null || dgEmpleados == null) return;
-            string filtro = txtBusqueda.Text.ToLower().Trim();
-
-            var listaFiltrada = _empleadosCache.Where(emp =>
-                emp.Nombre.ToLower().Contains(filtro) ||
-                (emp.Matricula != null && emp.Matricula.ToLower().Contains(filtro))
-            ).ToList();
-
-            dgEmpleados.ItemsSource = null;
-            dgEmpleados.ItemsSource = listaFiltrada;
-
-            if (lblTotal != null) lblTotal.Text = $"AGENTES REGISTRADOS: {listaFiltrada.Count}";
-            if (lblStatus != null) lblStatus.Text = $"SESIÓN: {SesionActual.Usuario?.Nombre.ToUpper()} | ROL: {(SesionActual.Usuario.EsSuperAdmin ? "SUPERADMIN" : "ADMIN")}";
+            if (lblTotal != null)
+                lblTotal.Text = $"AGENTES ACTIVOS: {total}";
         }
 
-        // Navegación mediante doble clic en la fila
-        private void BtnCalendario_Click(object sender, RoutedEventArgs e)
+        private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (sender is Button btn && btn.DataContext is Empleado seleccionado)
+            string filtro = txtBusqueda.Text?.Trim().ToLower() ?? "";
+
+            if (string.IsNullOrEmpty(filtro))
             {
-                Dispatcher.BeginInvoke(new Action(() => {
-                    if (this.NavigationService != null)
-                    {
-                        this.NavigationService.Navigate(new CalendarioEmpleado(seleccionado));
-                    }
-                }), System.Windows.Threading.DispatcherPriority.Background);
+                dgEmpleados.ItemsSource = DataService.Empleados;
+                ActualizarContador(DataService.Empleados.Count);
+                return;
             }
-        }
 
-        private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e) => FiltrarYMostrar();
+            // Filtro dinámico sobre la lista en memoria
+            var filtrados = DataService.Empleados
+                .Where(x =>
+                    (x.Nombre?.ToLower().Contains(filtro) ?? false) ||
+                    (x.Apellido?.ToLower().Contains(filtro) ?? false) ||
+                    (x.Matricula?.ToLower().Contains(filtro) ?? false) ||
+                    (x.Usuario?.ToLower().Contains(filtro) ?? false)
+                ).ToList();
+
+            dgEmpleados.ItemsSource = filtrados;
+            ActualizarContador(filtrados.Count);
+        }
 
         private void BtnNuevo_Click(object sender, RoutedEventArgs e)
         {
-            RegistroEmpleado win = new RegistroEmpleado();
-            win.Owner = Window.GetWindow(this);
-            if (win.ShowDialog() == true) CargarDatos();
+            NavigationService?.Navigate(new RegistroEmpleado());
         }
 
         private void BtnEliminar_Click(object sender, RoutedEventArgs e)
         {
-            if (dgEmpleados.SelectedItem is Empleado seleccionado)
+            if (dgEmpleados.SelectedItem is Empleado emp)
             {
-                if (seleccionado.EsSuperAdmin)
+                // Seguridad: No auto-eliminación
+                if (SesionActual.Usuario != null && SesionActual.Usuario.Id == emp.Id)
                 {
-                    MessageBox.Show("El Administrador Principal no puede ser eliminado por seguridad.", "Acción Denegada");
+                    MessageBox.Show("PROTOCOL DENIED: No puede desactivar su propio perfil administrativo.", "SECURITY ALERT");
                     return;
                 }
 
-                string pass = Interaction.InputBox($"Confirme con su contraseña para eliminar a ({seleccionado.Nombre}):", "Seguridad de Datos", "");
+                var confirm = MessageBox.Show(
+                    $"¿CONFIRMA DESACTIVACIÓN DEL AGENTE?\n\nNombre: {emp.Nombre} {emp.Apellido}\nMatrícula: {emp.Matricula}",
+                    "CONFIRMACIÓN DE BAJA",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning
+                );
 
-                if (string.IsNullOrEmpty(pass)) return;
-
-                if (pass == SesionActual.Usuario.Password)
+                if (confirm == MessageBoxResult.Yes)
                 {
-                    DataService.EliminarEmpleado(seleccionado.Id);
-                    CargarDatos();
+                    try
+                    {
+                        // Llama al DataService que ya tiene el UPDATE SQL
+                        DataService.EliminarEmpleado(emp.Id);
+
+                        // Refrescamos la vista
+                        CargarDatosDesdeDB();
+
+                        MessageBox.Show("AGENTE DESACTIVADO CORRECTAMENTE.", "LOG: ÉXITO");
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("FALLO EN OPERACIÓN: " + ex.Message);
+                    }
                 }
-                else { MessageBox.Show("Contraseña de administrador incorrecta.", "Error"); }
+            }
+            else
+            {
+                MessageBox.Show("Seleccione un agente del roster.");
             }
         }
 
         private void BtnRoles_Click(object sender, RoutedEventArgs e)
         {
-            if (dgEmpleados.SelectedItem is Empleado seleccionado)
+            if (dgEmpleados.SelectedItem is Empleado emp)
             {
-                if (seleccionado.EsSuperAdmin) return;
+                // Invertimos el rol actual
+                bool nuevoEstado = !emp.EsAdmin;
+                string rango = nuevoEstado ? "ADMINISTRADOR" : "AGENTE OPERATIVO";
 
-                string pass = Interaction.InputBox($"Autorice el cambio de rango para ({seleccionado.Nombre}):", "Gestión de Permisos", "");
+                var result = MessageBox.Show($"¿Cambiar rango de {emp.Nombre} a {rango}?", "GESTIÓN DE ROLES", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
-                if (string.IsNullOrEmpty(pass)) return;
-
-                if (pass == SesionActual.Usuario.Password)
+                if (result == MessageBoxResult.Yes)
                 {
-                    seleccionado.EsAdmin = !seleccionado.EsAdmin;
-                    DataService.GuardarTodo();
-                    CargarDatos();
+                    try
+                    {
+                        DataService.CambiarPermisos(emp.Id, nuevoEstado);
+                        CargarDatosDesdeDB();
+                        MessageBox.Show("RANGO ACTUALIZADO.", "SISTEMA");
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Error: " + ex.Message);
+                    }
                 }
-                else { MessageBox.Show("Autorización denegada."); }
+            }
+        }
+
+        private void BtnCalendario_Click(object sender, RoutedEventArgs e) => AbrirCalendarioSeleccionado();
+        private void DgEmpleados_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e) => AbrirCalendarioSeleccionado();
+
+        private void AbrirCalendarioSeleccionado()
+        {
+            if (dgEmpleados.SelectedItem is Empleado emp)
+            {
+                NavigationService?.Navigate(new CalendarioEmpleado(emp));
+            }
+            else
+            {
+                MessageBox.Show("Seleccione un agente para desplegar calendario.");
             }
         }
     }
