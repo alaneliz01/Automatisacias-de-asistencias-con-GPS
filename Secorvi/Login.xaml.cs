@@ -28,7 +28,6 @@ namespace Secorvi
             }
             catch (Exception ex)
             {
-                // Si la conexión a MySQL falla aquí, lo verás en el brdStatus del XAML
                 MostrarAviso("ERROR DE CONEXIÓN: " + ex.Message, "#F8D7DA", "#721C24");
             }
         }
@@ -44,12 +43,8 @@ namespace Secorvi
                 return;
             }
 
-            // IMPORTANTE: Forzamos una recarga antes de buscar para asegurar que 
-            // si acabas de registrar a alguien, ya aparezca aquí.
             DataService.CargarEmpleados();
 
-            // Buscamos coincidencia en la lista cargada de MySQL
-            // Usamos .FirstOrDefault() que es más estándar en LINQ
             var encontrado = DataService.Empleados.FirstOrDefault(x =>
                 x.Usuario.Equals(userDigitado, StringComparison.OrdinalIgnoreCase) &&
                 x.Contrasena == passDigitada);

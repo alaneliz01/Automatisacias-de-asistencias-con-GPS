@@ -10,7 +10,6 @@
         public string Estatus { get; set; }
         public double Latitud { get; set; }
         public double Longitud { get; set; }
-        public string Incidentes { get; set; }
         public string LinkMapa => $"https://www.google.com/maps?q={Latitud},{Longitud}";
     }
 }

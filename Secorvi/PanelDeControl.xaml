@@ -191,11 +191,37 @@
             </DataGrid>
         </Border>
 
-        <Border Grid.Row="3" Background="#161920" CornerRadius="0,0,8,8" Padding="15,8" BorderBrush="#2D323E" BorderThickness="1,0,1,1">
-            <DockPanel>
-                <TextBlock x:Name="lblStatus" Text="SISTEMA ACTIVO | VINCULADO CON n8n ENGINE" Foreground="#4B5563" FontSize="10" FontWeight="Bold"/>
-                <TextBlock Text="SECORVI MONITORING" Foreground="#2ECC71" FontSize="10" FontWeight="Bold" HorizontalAlignment="Right"/>
-            </DockPanel>
+        <Border Grid.Row="3" Background="#161920" CornerRadius="0,0,8,8" Padding="20,12" BorderBrush="#2D323E" BorderThickness="1,0,1,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="ESTADOS DE ASISTENCIA:" Foreground="#4B5563" FontSize="9" FontWeight="Black" Margin="0,0,15,0" VerticalAlignment="Center"/>
+
+                    <Ellipse Width="8" Height="8" Fill="#2ECC71" Margin="0,0,5,0"/>
+                    <TextBlock Text="EN PUNTO" Foreground="#E0E0E0" FontSize="9" Margin="0,0,15,0" VerticalAlignment="Center"/>
+
+                    <Ellipse Width="8" Height="8" Fill="#F1C40F" Margin="0,0,5,0"/>
+                    <TextBlock Text="REPORTE FUERA" Foreground="#E0E0E0" FontSize="9" Margin="0,0,15,0" VerticalAlignment="Center"/>
+
+                    <Ellipse Width="8" Height="8" Fill="#E74C3C" Margin="0,0,5,0"/>
+                    <TextBlock Text="SIN REPORTE" Foreground="#E0E0E0" FontSize="9" Margin="0,0,15,0" VerticalAlignment="Center"/>
+
+                    <Rectangle Width="1" Fill="#2D323E" Margin="10,2" Height="15"/>
+
+                    <TextBlock Text="🖱️ DOBLE CLIC: Abrir Calendario" Foreground="#6B7280" FontSize="9" Margin="15,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="ENGINE:" Foreground="#4B5563" FontSize="9" FontWeight="Black" VerticalAlignment="Center"/>
+                    <TextBlock Text=" n8n ACTIVE" Foreground="#2ECC71" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                    <Rectangle Width="1" Fill="#2D323E" Margin="15,2" Height="15"/>
+                    <TextBlock Text="SECORVI v2.0" Foreground="#FFB300" FontSize="10" FontWeight="Black" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </Page>

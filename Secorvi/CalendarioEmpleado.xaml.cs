@@ -86,7 +86,7 @@ namespace Secorvi
         {
             if (GridCalendario == null) return;
 
-            // 1. Limpieza de bloques visuales anteriores
+            // 1. Limpieza visual de bloques anteriores
             var paraEliminar = GridCalendario.Children.OfType<Border>()
                 .Where(b => b.Tag?.ToString() == "VISUAL_ASIG").ToList();
             foreach (var b in paraEliminar) GridCalendario.Children.Remove(b);
@@ -100,24 +100,32 @@ namespace Secorvi
                 a.Fecha.Date >= _lunesActual.Date &&
                 a.Fecha.Date <= _lunesActual.AddDays(6).Date).ToList();
 
+            // --- TRES CONTADORES INDEPENDIENTES ---
+            int serviciosContador = 0;
+            int descansosContador = 0;
+            int vacacionesContador = 0;
+
+            if (lblRangoSemana != null)
+                lblRangoSemana.Text = $"{_lunesActual:dd MMM} - {_lunesActual.AddDays(6):dd MMM}".ToUpper();
+
             foreach (var asig in asignaciones)
             {
                 var turno = DataService.Turnos.FirstOrDefault(t => t.Id == asig.IdTurno);
                 var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.Id == asig.IdUbicacion);
 
-                // Seguridad: Si no hay turno, no podemos dibujar nada (evita FormatException)
                 if (turno == null) continue;
 
-                // Calcular columna (Lunes = 1, Domingo = 7)
-                int col = (int)asig.Fecha.DayOfWeek;
-                col = (col == 0) ? 7 : col;
+                // --- LÓGICA DE CONTEO ---
+                if (asig.Estatus == "VACACIONES") vacacionesContador++;
+                else if (asig.Estatus == "DÍA LIBRE") descansosContador++;
+                else serviciosContador++;
 
-                // --- PALETA DE COLORES ---
+                // --- COLORES CORREGIDOS SEGÚN TU GUÍA ---
                 Color colorBase = asig.Estatus switch
                 {
-                    "VACACIONES" => Color.FromRgb(41, 128, 185), // Azul
-                    "DÍA LIBRE" => Color.FromRgb(55, 65, 81),    // Gris
-                    _ => Color.FromRgb(192, 57, 43)              // Rojo (Servicio)
+                    "VACACIONES" => Color.FromRgb(52, 152, 219), // AZUL (Vacaciones)
+                    "DÍA LIBRE" => Color.FromRgb(55, 65, 81),    // GRIS (Descanso)
+                    _ => Color.FromRgb(192, 57, 43)              // ROJO (Servicio)
                 };
 
                 Border bloque = new Border
@@ -134,29 +142,16 @@ namespace Secorvi
                 bloque.MouseLeftButtonDown += (s, ev) => {
                     ev.Handled = true;
                     _fechasSeleccionadas = new List<DateTime> { asig.Fecha };
-                    _menuContexto.Placement = PlacementMode.MousePoint;
+                    _menuContexto.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
                     _menuContexto.IsOpen = true;
                 };
 
-                // --- CONSTRUCCIÓN DEL TEXTO (Blindado contra errores de formato) ---
-                string texto;
-                if (asig.Estatus == "VACACIONES")
+                string texto = asig.Estatus switch
                 {
-                    texto = "VACACIONES";
-                }
-                else if (asig.Estatus == "DÍA LIBRE")
-                {
-                    texto = "DESCANSO";
-                }
-                else
-                {
-                    // Convertimos TimeSpan a DateTime para que el formato "hh:mm tt" funcione siempre
-                    DateTime horaI = DateTime.Today.Add(turno.HoraInicio);
-                    DateTime horaF = DateTime.Today.Add(turno.HoraFin);
-                    string nombreLugar = ubi?.Nombre ?? "PUNTO";
-
-                    texto = $"{nombreLugar}\n{horaI:hh:mm tt} - {horaF:hh:mm tt}".ToUpper();
-                }
+                    "VACACIONES" => "VACACIONES",
+                    "DÍA LIBRE" => "DESCANSO",
+                    _ => $"{ubi?.Nombre ?? "PUNTO"}\n{DateTime.Today.Add(turno.HoraInicio):hh:mm tt} - {DateTime.Today.Add(turno.HoraFin):hh:mm tt}".ToUpper()
+                };
 
                 bloque.Child = new TextBlock
                 {
@@ -166,13 +161,13 @@ namespace Secorvi
                     FontWeight = FontWeights.Bold,
                     TextAlignment = TextAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
-                    TextWrapping = TextWrapping.Wrap // Para que el nombre del punto no se corte
+                    TextWrapping = TextWrapping.Wrap
                 };
 
-                // --- POSICIONAMIENTO EN EL GRID ---
+                // Posicionamiento
+                int col = (int)asig.Fecha.DayOfWeek;
+                col = (col == 0) ? 7 : col;
                 int row = turno.HoraInicio.Hours + 1;
-
-                // Calculamos el tamaño (Span). Si es de 12am a 12am, el resultado es 0, así que forzamos 24.
                 int span = (int)(turno.HoraFin - turno.HoraInicio).TotalHours;
                 if (span <= 0) span = 24;
 
@@ -181,8 +176,12 @@ namespace Secorvi
                 Grid.SetRowSpan(bloque, span);
                 GridCalendario.Children.Add(bloque);
             }
-        }
 
+            // --- ACTUALIZACIÓN DE ETIQUETAS ---
+            if (lblTotalServicios != null) lblTotalServicios.Text = serviciosContador.ToString();
+            if (lblTotalDescansos != null) lblTotalDescansos.Text = descansosContador.ToString();
+            if (lblTotalVacaciones != null) lblTotalVacaciones.Text = vacacionesContador.ToString();
+        }
         private void CrearMenuContexto()
         {
             _menuContexto = new ContextMenu();
@@ -204,6 +203,40 @@ namespace Secorvi
             ActualizarVista();
         }
 
+        private void MenuItem_LimpiarDia_Click(object sender, RoutedEventArgs e)
+        {
+            EjecutarEliminacionSilenciosa();
+        }
+
+        private void MenuItem_CopiarDia_Click(object sender, RoutedEventArgs e)
+        {
+            if (_fechasSeleccionadas.Count > 0)
+            {
+                DateTime fechaOrigen = _fechasSeleccionadas.First().Date;
+                DateTime fechaDestino = fechaOrigen.AddDays(1);
+                var asigOriginal = DataService.Asignaciones.FirstOrDefault(a =>
+                    a.IdEmpleado == _empleado.Id && a.Fecha.Date == fechaOrigen);
+
+                if (asigOriginal != null)
+                {
+
+                    DataService.EliminarAsignacionPorFecha(_empleado.Id, fechaDestino);
+
+                    var copia = new Asignacion
+                    {
+                        IdEmpleado = asigOriginal.IdEmpleado,
+                        IdUbicacion = asigOriginal.IdUbicacion,
+                        IdTurno = asigOriginal.IdTurno,
+                        Fecha = fechaDestino,
+                        Estatus = asigOriginal.Estatus
+                    };
+                    DataService.CrearAsignacion(copia);
+                    ActualizarVista();
+                    MessageBox.Show("Turno copiado al día siguiente.");
+                }
+            }
+        }
+
         private void Celda_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) { _dragging = true; _startCell = sender as Border; Mouse.Capture(GridCalendario, CaptureMode.SubTree); LimpiarSeleccionVisual(); }
         private void Celda_PreviewMouseMove(object sender, MouseEventArgs e) { if (_dragging && _startCell != null && sender is Border c) SeleccionarRango((DateTime)_startCell.Tag, (DateTime)c.Tag); }
         private void Celda_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e) { _dragging = false; Mouse.Capture(null); if (_fechasSeleccionadas.Count > 0) { _menuContexto.Placement = PlacementMode.MousePoint; _menuContexto.IsOpen = true; } }
@@ -218,8 +251,6 @@ namespace Secorvi
         }
         private void LimpiarSeleccionVisual() { foreach (Border b in GridCalendario.Children.OfType<Border>().Where(x => x.Tag is DateTime)) b.Background = Brushes.Transparent; _fechasSeleccionadas.Clear(); }
         private void ActualizarVista() { CargarAsignaciones(); }
-
-        // EVENTOS DE BOTONES
         private void DpSaltoFecha_SelectedDateChanged(object sender, SelectionChangedEventArgs e) { if (dpSaltoFecha?.SelectedDate != null) { DateTime f = dpSaltoFecha.SelectedDate.Value; _lunesActual = f.AddDays(-(int)(f.DayOfWeek == DayOfWeek.Sunday ? 6 : (int)f.DayOfWeek - 1)); DibujarGrid(); ActualizarVista(); } }
         private void BtnAsignarHorario_Click(object sender, RoutedEventArgs e) { Mapa win = new Mapa(_empleado.Id, _lunesActual); win.Owner = Window.GetWindow(this); if (win.ShowDialog() == true) ActualizarVista(); }
         private void BtnVolver_Click(object sender, RoutedEventArgs e) => NavigationService?.GoBack();

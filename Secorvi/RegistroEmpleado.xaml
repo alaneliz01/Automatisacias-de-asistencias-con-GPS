@@ -1,42 +1,58 @@
-﻿<Page x:Class="Secorvi.RegistroEmpleado"
-      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-      mc:Ignorable="d" 
-      Title="SECORVI - Nuevo Agente" Height="600" Width="350" 
-      Background="#161618">
+﻿<Window x:Class="Secorvi.RegistroEmpleado"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SECORVI - Registro" Height="600" Width="380"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterScreen">
 
-    <Border BorderBrush="#2D323E" BorderThickness="1" CornerRadius="10">
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="30">
-                <TextBlock Text="REGISTRO TÁCTICO" Foreground="#FFC107" FontWeight="Bold" FontSize="16" Margin="0,0,0,20" HorizontalAlignment="Center"/>
+    <Border Background="#111827" CornerRadius="15" BorderBrush="#374151" BorderThickness="1.5">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="50"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-                <TextBlock Text="MATRÍCULA (AUTO)" Foreground="#555" FontSize="10" FontWeight="Bold"/>
-                <TextBox x:Name="txtMatricula" IsReadOnly="True" Background="#252526" Foreground="#888" Padding="10" Margin="0,5,0,15" BorderThickness="0"/>
+            <Border Grid.Row="0" Background="#1F2937" CornerRadius="15,15,0,0" 
+                    MouseLeftButtonDown="Border_MouseLeftButtonDown">
+                <DockPanel Margin="20,0">
+                    <TextBlock Text="🛡️ ALTA DE AGENTE" Foreground="#FFB300" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <Button Content="✕" Click="BtnCancelar_Click" HorizontalAlignment="Right" 
+                            Background="Transparent" Foreground="White" BorderThickness="0" FontWeight="Bold" Cursor="Hand"/>
+                </DockPanel>
+            </Border>
 
-                <TextBlock Text="NOMBRE(S)" Foreground="#555" FontSize="10" FontWeight="Bold"/>
-                <TextBox x:Name="txtNombre" Background="#252526" Foreground="White" Padding="10" Margin="0,5,0,15" BorderThickness="0"/>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
+                <StackPanel Margin="30,20">
 
-                <TextBlock Text="APELLIDOS" Foreground="#555" FontSize="10" FontWeight="Bold"/>
-                <TextBox x:Name="txtApellido" Background="#252526" Foreground="White" Padding="10" Margin="0,5,0,15" BorderThickness="0"/>
+                    <TextBlock Text="MATRÍCULA (SISTEMA)" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBox x:Name="txtMatricula" IsReadOnly="True" Background="#0F172A" Foreground="#FFB300" 
+                             BorderBrush="#374151" Padding="10" Margin="0,0,0,15" BorderThickness="1"/>
 
-                <TextBlock Text="WHATSAPP (10 DÍGITOS)" Foreground="#555" FontSize="10" FontWeight="Bold"/>
-                <TextBox x:Name="txtTelefono" Background="#252526" Foreground="White" Padding="10" Margin="0,5,0,15" BorderThickness="0"/>
+                    <TextBlock Text="NOMBRE(S)" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBox x:Name="txtNombre" Background="#1F2937" Foreground="White" BorderBrush="#374151" Padding="10" Margin="0,0,0,15"/>
 
-                <TextBlock Text="CONTRASEÑA DE ACCESO" Foreground="#555" FontSize="10" FontWeight="Bold"/>
-                <PasswordBox x:Name="txtPass" Background="#252526" Foreground="White" Padding="10" Margin="0,5,0,25" BorderThickness="0"/>
+                    <TextBlock Text="APELLIDOS" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBox x:Name="txtApellido" Background="#1F2937" Foreground="White" BorderBrush="#374151" Padding="10" Margin="0,0,0,15"/>
 
-                <Button Content="GUARDAR AGENTE" Click="BtnGuardar_Click" Height="45" Background="#FFC107" Foreground="Black" FontWeight="Bold" Cursor="Hand">
-                    <Button.Resources>
-                        <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="4"/>
-                        </Style>
-                    </Button.Resources>
-                </Button>
+                    <TextBlock Text="WHATSAPP" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBox x:Name="txtTelefono" Background="#1F2937" Foreground="White" BorderBrush="#374151" Padding="10" Margin="0,0,0,15" MaxLength="10"/>
 
-                <Button Content="CANCELAR" Click="BtnCancelar_Click" Margin="0,10,0,0" Background="Transparent" Foreground="#666" BorderThickness="0" Cursor="Hand"/>
-            </StackPanel>
-        </ScrollViewer>
+                    <TextBlock Text="CONTRASEÑA" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <PasswordBox x:Name="txtPass" Background="#1F2937" Foreground="White" BorderBrush="#374151" Padding="10" Margin="0,0,0,25"/>
+
+                    <Button Content="REGISTRAR EN BASE DE DATOS" Click="BtnGuardar_Click" Height="45" 
+                            Background="#FFB300" Foreground="Black" FontWeight="Bold" Cursor="Hand">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="8"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+
+                    <Button Content="CANCELAR OPERACIÓN" Click="BtnCancelar_Click" Margin="0,15,0,0" 
+                            Background="Transparent" Foreground="#6B7280" BorderThickness="0" Cursor="Hand" FontSize="10"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
     </Border>
-</Page>
+</Window>

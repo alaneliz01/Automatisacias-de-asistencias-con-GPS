@@ -10,7 +10,7 @@ namespace Secorvi
 {
     public static class DataService
     {
-        private static string connectionString = "Server=localhost;Database=secorvi_db;Uid=root;Pwd=2037888;AllowPublicKeyRetrieval=true;";
+        private static string connectionString = "Server=localhost;Database=secorvi_db;Uid=root;Pwd=2037888;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
 
         public static List<Empleado> Empleados { get; set; } = new List<Empleado>();
         public static List<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
@@ -55,7 +55,6 @@ namespace Secorvi
             }
         }
 
-        // --- GESTIÓN DE EMPLEADOS ---
         public static void CargarEmpleados()
         {
             Empleados.Clear();
@@ -76,9 +75,9 @@ namespace Secorvi
                                 Apellido = r["apellido"]?.ToString() ?? "",
                                 Matricula = r["matricula"]?.ToString() ?? "",
                                 Telefono = r["telefono"]?.ToString() ?? "",
-                                Usuario = r["usuario"]?.ToString()?.Trim() ?? "",
-                                Contrasena = r["contrasena"]?.ToString()?.Trim() ?? "",
-                                EsAdmin = r["es_admin"] != DBNull.Value && Convert.ToBoolean(r["es_admin"]),
+                                Usuario = r["usuario"]?.ToString() ?? "",
+                                Contrasena = r["contrasena"]?.ToString() ?? "",
+                                Rol = r["rol"]?.ToString() ?? "AGENTE",
                                 Activo = r["activo"] != DBNull.Value && Convert.ToBoolean(r["activo"])
                             });
                         }
@@ -92,7 +91,10 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = "INSERT INTO empleados (nombre, apellido, matricula, telefono, usuario, contrasena, es_admin, activo) VALUES (@nom, @ape, @mat, @tel, @usu, @con, @adm, 1)";
+                // CAMBIO AQUÍ: Cambiamos 'es_admin' por 'rol'
+                string query = "INSERT INTO empleados (nombre, apellido, matricula, telefono, usuario, contrasena, rol, activo) " +
+                               "VALUES (@nom, @ape, @mat, @tel, @usu, @con, @rol, 1)";
+
                 var cmd = new MySqlCommand(query, conn);
                 cmd.Parameters.AddWithValue("@nom", emp.Nombre);
                 cmd.Parameters.AddWithValue("@ape", emp.Apellido);
@@ -100,7 +102,8 @@ namespace Secorvi
                 cmd.Parameters.AddWithValue("@tel", emp.Telefono);
                 cmd.Parameters.AddWithValue("@usu", emp.Usuario);
                 cmd.Parameters.AddWithValue("@con", emp.Contrasena);
-                cmd.Parameters.AddWithValue("@adm", emp.EsAdmin);
+                cmd.Parameters.AddWithValue("@rol", emp.Rol);
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -124,10 +127,13 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = "UPDATE empleados SET es_admin = @adm WHERE id = @id";
+                string nuevoRol = esAdmin ? "ADMIN" : "AGENTE";
+                string query = "UPDATE empleados SET rol = @rol WHERE id = @id";
+
                 var cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@adm", esAdmin);
+                cmd.Parameters.AddWithValue("@rol", nuevoRol);
                 cmd.Parameters.AddWithValue("@id", id);
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -232,6 +238,7 @@ namespace Secorvi
                 try
                 {
                     conn.Open();
+        
                     var cmd = new MySqlCommand("SELECT * FROM asignaciones", conn);
                     using (var r = cmd.ExecuteReader())
                     {
@@ -251,7 +258,7 @@ namespace Secorvi
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine("Error al cargar asignaciones: " + ex.Message);
+                    System.Diagnostics.Debug.WriteLine("Error crítico en DataService: " + ex.Message);
                 }
             }
         }

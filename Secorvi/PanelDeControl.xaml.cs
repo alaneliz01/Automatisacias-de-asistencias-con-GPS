@@ -13,7 +13,6 @@ namespace Secorvi
         public PanelDeControl()
         {
             InitializeComponent();
-            // Recargar datos cada vez que la página gane foco o regreses a ella
             this.Loaded += (s, e) => CargarDatosDesdeDB();
         }
 
@@ -21,10 +20,7 @@ namespace Secorvi
         {
             try
             {
-                // Forzamos al DataService a ir a MySQL
                 DataService.ActualizarTodo();
-
-                // IMPORTANTE: Limpiar el ItemsSource antes de reasignar
                 dgEmpleados.ItemsSource = null;
                 dgEmpleados.ItemsSource = DataService.Empleados;
 
@@ -68,7 +64,12 @@ namespace Secorvi
 
         private void BtnNuevo_Click(object sender, RoutedEventArgs e)
         {
-            NavigationService?.Navigate(new RegistroEmpleado());
+            RegistroEmpleado ventanaRegistro = new RegistroEmpleado();
+            ventanaRegistro.Owner = Window.GetWindow(this);
+            if (ventanaRegistro.ShowDialog() == true)
+            {
+                CargarDatosDesdeDB(); 
+            }
         }
 
         private void BtnEliminar_Click(object sender, RoutedEventArgs e)

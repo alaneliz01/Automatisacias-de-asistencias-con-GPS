@@ -2,12 +2,12 @@
 using System;
 using System.Linq;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Navigation;
+using System.Windows.Input;
 
 namespace Secorvi
 {
-    public partial class RegistroEmpleado : Page
+    // Cambiamos 'Page' por 'Window'
+    public partial class RegistroEmpleado : Window
     {
         public RegistroEmpleado()
         {
@@ -16,56 +16,53 @@ namespace Secorvi
             txtMatricula.Text = "SEC-" + DateTime.Now.ToString("HHmmss");
         }
 
+        private void Border_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed) DragMove();
+        }
+
         private void BtnGuardar_Click(object sender, RoutedEventArgs e)
         {
-            // 1. Validación de campos obligatorios
             if (string.IsNullOrWhiteSpace(txtNombre.Text) ||
                 string.IsNullOrWhiteSpace(txtApellido.Text) ||
                 string.IsNullOrWhiteSpace(txtPass.Password))
             {
-                MessageBox.Show("SISTEMA: Complete todos los campos antes de continuar.");
+                MessageBox.Show("SISTEMA: Complete todos los campos obligatorios.", "ADVERTENCIA");
                 return;
             }
 
             try
             {
-                // 2. Crear el objeto con los datos del formulario
                 var nuevoEmpleado = new Empleado
                 {
-                    Nombre = txtNombre.Text.ToUpper(),
-                    Apellido = txtApellido.Text.ToUpper(),
+                    Nombre = txtNombre.Text.Trim().ToUpper(),
+                    Apellido = txtApellido.Text.Trim().ToUpper(),
                     Matricula = txtMatricula.Text,
-                    Telefono = txtTelefono.Text,
+                    Telefono = txtTelefono.Text.Trim(),
+                    // Generamos un usuario sugerido (Nombre + segundos)
                     Usuario = txtNombre.Text.Split(' ')[0].ToLower() + DateTime.Now.Second.ToString(),
                     Contrasena = txtPass.Password,
-                    EsAdmin = false,
+                    Rol = "AGENTE", // Usamos el campo Rol que lee tu DataService
                     Activo = true
                 };
 
-                // 3. Guardar en MySQL a través del DataService
                 DataService.AgregarEmpleado(nuevoEmpleado);
 
                 MessageBox.Show("AGENTE REGISTRADO EXITOSAMENTE", "OPERACIÓN TÁCTICA");
 
-                // 4. NAVEGACIÓN (Correcto para una Page)
-                if (NavigationService.CanGoBack)
-                {
-                    NavigationService.GoBack();
-                }
+
+                this.DialogResult = true;
+                this.Close();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("ERROR AL REGISTRAR: " + ex.Message, "FALLO DE SISTEMA");
+                MessageBox.Show("FALLO DE SISTEMA: " + ex.Message, "ERROR CRÍTICO");
             }
         }
 
         private void BtnCancelar_Click(object sender, RoutedEventArgs e)
         {
-            // Regresar al Panel de Control sin guardar
-            if (this.NavigationService != null && this.NavigationService.CanGoBack)
-            {
-                this.NavigationService.GoBack();
-            }
+            this.Close();
         }
     }
 }
