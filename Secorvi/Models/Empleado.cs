@@ -11,13 +11,10 @@
         public string Contrasena { get; set; }
         public string Rol { get; set; }
         public bool Activo { get; set; }
-
+        public bool CumplioAsistenciaHoy { get; set; }
         private bool _esAdmin;
-        public bool EsAdmin
-        {
-            get { return Rol == "ADMIN" || _esAdmin; }
-            set { _esAdmin = value; }
-        }
+        public bool EsAdmin => Rol == "ADMIN";
+
 
         public string NombreCompleto => $"{Nombre} {Apellido}";
     }

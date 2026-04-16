@@ -3,13 +3,12 @@ using Secorvi.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows;
-using System.Globalization;
 
 namespace Secorvi
 {
     public static class DataService
     {
+        // Cadena de conexión única para todo el servicio
         private static string connectionString = "Server=localhost;Database=secorvi_db;Uid=root;Pwd=2037888;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
 
         public static List<Empleado> Empleados { get; set; } = new List<Empleado>();
@@ -55,6 +54,8 @@ namespace Secorvi
             }
         }
 
+        // --- GESTIÓN DE EMPLEADOS ---
+
         public static void CargarEmpleados()
         {
             Empleados.Clear();
@@ -63,6 +64,7 @@ namespace Secorvi
                 try
                 {
                     conn.Open();
+                    // Seleccionamos también cumplio_asistencia_hoy para el Panel
                     var cmd = new MySqlCommand("SELECT * FROM empleados WHERE activo = 1", conn);
                     using (var r = cmd.ExecuteReader())
                     {
@@ -78,12 +80,13 @@ namespace Secorvi
                                 Usuario = r["usuario"]?.ToString() ?? "",
                                 Contrasena = r["contrasena"]?.ToString() ?? "",
                                 Rol = r["rol"]?.ToString() ?? "AGENTE",
-                                Activo = r["activo"] != DBNull.Value && Convert.ToBoolean(r["activo"])
+                                Activo = r["activo"] != DBNull.Value && Convert.ToBoolean(r["activo"]),
+                                CumplioAsistenciaHoy = r["cumplio_asistencia_hoy"] != DBNull.Value && Convert.ToBoolean(r["cumplio_asistencia_hoy"])
                             });
                         }
                     }
                 }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex.Message); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Error CargarEmpleados: " + ex.Message); }
             }
         }
 
@@ -91,9 +94,8 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                // CAMBIO AQUÍ: Cambiamos 'es_admin' por 'rol'
-                string query = "INSERT INTO empleados (nombre, apellido, matricula, telefono, usuario, contrasena, rol, activo) " +
-                               "VALUES (@nom, @ape, @mat, @tel, @usu, @con, @rol, 1)";
+                string query = "INSERT INTO empleados (nombre, apellido, matricula, telefono, usuario, contrasena, rol, activo, cumplio_asistencia_hoy) " +
+                               "VALUES (@nom, @ape, @mat, @tel, @usu, @con, @rol, 1, 0)";
 
                 var cmd = new MySqlCommand(query, conn);
                 cmd.Parameters.AddWithValue("@nom", emp.Nombre);
@@ -123,24 +125,25 @@ namespace Secorvi
             CargarEmpleados();
         }
 
-        public static void CambiarPermisos(int id, bool esAdmin)
+        public static void CambiarPermisos(int id, bool hacerAdmin)
         {
-            using (var conn = new MySqlConnection(connectionString))
+            string nuevoRol = hacerAdmin ? "ADMIN" : "AGENTE";
+            using (var conexion = new MySqlConnection(connectionString))
             {
-                string nuevoRol = esAdmin ? "ADMIN" : "AGENTE";
-                string query = "UPDATE empleados SET rol = @rol WHERE id = @id";
-
-                var cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@rol", nuevoRol);
-                cmd.Parameters.AddWithValue("@id", id);
-
-                conn.Open();
-                cmd.ExecuteNonQuery();
+                conexion.Open();
+                string sql = "UPDATE empleados SET rol = @rol WHERE id = @id";
+                using (var cmd = new MySqlCommand(sql, conexion))
+                {
+                    cmd.Parameters.AddWithValue("@rol", nuevoRol);
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.ExecuteNonQuery();
+                }
             }
             CargarEmpleados();
         }
 
         // --- GESTIÓN DE UBICACIONES ---
+
         public static void CargarUbicaciones()
         {
             Ubicaciones.Clear();
@@ -187,6 +190,7 @@ namespace Secorvi
         }
 
         // --- GESTIÓN DE TURNOS ---
+
         public static void CargarTurnos()
         {
             Turnos.Clear();
@@ -230,6 +234,7 @@ namespace Secorvi
         }
 
         // --- GESTIÓN DE ASIGNACIONES ---
+
         public static void CargarAsignaciones()
         {
             Asignaciones.Clear();
@@ -238,7 +243,6 @@ namespace Secorvi
                 try
                 {
                     conn.Open();
-        
                     var cmd = new MySqlCommand("SELECT * FROM asignaciones", conn);
                     using (var r = cmd.ExecuteReader())
                     {
@@ -256,10 +260,7 @@ namespace Secorvi
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("Error crítico en DataService: " + ex.Message);
-                }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Error CargarAsignaciones: " + ex.Message); }
             }
         }
 

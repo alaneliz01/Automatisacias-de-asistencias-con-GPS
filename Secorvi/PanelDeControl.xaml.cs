@@ -4,16 +4,49 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Navigation;
+using System.Windows.Threading;
 
 namespace Secorvi
 {
     public partial class PanelDeControl : Page
     {
+        private DispatcherTimer _autoRefreshTimer;
+
         public PanelDeControl()
         {
             InitializeComponent();
-            this.Loaded += (s, e) => CargarDatosDesdeDB();
+            this.Loaded += PanelDeControl_Loaded;
+            this.Unloaded += PanelDeControl_Unloaded;
+        }
+
+        private void PanelDeControl_Loaded(object sender, RoutedEventArgs e)
+        {
+            CargarDatosDesdeDB();
+            ConfigurarAutoRefresco();
+        }
+
+        private void PanelDeControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+
+            if (_autoRefreshTimer != null)
+            {
+                _autoRefreshTimer.Stop();
+            }
+        }
+
+        private void ConfigurarAutoRefresco()
+        {
+            if (_autoRefreshTimer == null)
+            {
+                _autoRefreshTimer = new DispatcherTimer();
+                _autoRefreshTimer.Interval = TimeSpan.FromSeconds(30);
+                _autoRefreshTimer.Tick += (s, ev) => CargarDatosDesdeDB();
+            }
+
+            if (!_autoRefreshTimer.IsEnabled)
+            {
+                _autoRefreshTimer.Start();
+            }
         }
 
         private void CargarDatosDesdeDB()
@@ -24,93 +57,65 @@ namespace Secorvi
                 dgEmpleados.ItemsSource = null;
                 dgEmpleados.ItemsSource = DataService.Empleados;
 
-                ActualizarContador(DataService.Empleados.Count);
+                int totalAsistencias = DataService.Empleados.Count(x => x.CumplioAsistenciaHoy);
+                ActualizarContador(DataService.Empleados.Count, totalAsistencias);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("ERROR AL REFRESCAR PANEL: " + ex.Message, "DB ERROR");
+                System.Diagnostics.Debug.WriteLine("Error en refresh: " + ex.Message);
             }
         }
 
-        private void ActualizarContador(int total)
+        private void ActualizarContador(int total, int asistencias)
         {
             if (lblTotal != null)
-                lblTotal.Text = $"AGENTES ACTIVOS: {total}";
+                lblTotal.Text = $"AGENTES ACTIVOS: {total} | ASISTENCIAS HOY: {asistencias}";
         }
 
+
+        // este es el filtro de busqueda, se ejecuta cada vez que el texto cambia en el txtBusqueda
         private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
         {
             string filtro = txtBusqueda.Text?.Trim().ToLower() ?? "";
-
             if (string.IsNullOrEmpty(filtro))
             {
                 dgEmpleados.ItemsSource = DataService.Empleados;
-                ActualizarContador(DataService.Empleados.Count);
+                ActualizarContador(DataService.Empleados.Count, DataService.Empleados.Count(x => x.CumplioAsistenciaHoy));
                 return;
             }
 
-            // Filtro dinámico sobre la lista en memoria
-            var filtrados = DataService.Empleados
-                .Where(x =>
-                    (x.Nombre?.ToLower().Contains(filtro) ?? false) ||
-                    (x.Apellido?.ToLower().Contains(filtro) ?? false) ||
-                    (x.Matricula?.ToLower().Contains(filtro) ?? false) ||
-                    (x.Usuario?.ToLower().Contains(filtro) ?? false)
-                ).ToList();
+            var filtrados = DataService.Empleados.Where(x =>
+                (x.Nombre?.ToLower().Contains(filtro) ?? false) ||
+                (x.Apellido?.ToLower().Contains(filtro) ?? false) ||
+                (x.Matricula?.ToLower().Contains(filtro) ?? false)
+            ).ToList();
 
             dgEmpleados.ItemsSource = filtrados;
-            ActualizarContador(filtrados.Count);
+            ActualizarContador(filtrados.Count, filtrados.Count(x => x.CumplioAsistenciaHoy));
         }
 
         private void BtnNuevo_Click(object sender, RoutedEventArgs e)
         {
             RegistroEmpleado ventanaRegistro = new RegistroEmpleado();
             ventanaRegistro.Owner = Window.GetWindow(this);
-            if (ventanaRegistro.ShowDialog() == true)
-            {
-                CargarDatosDesdeDB(); 
-            }
+            if (ventanaRegistro.ShowDialog() == true) CargarDatosDesdeDB();
         }
 
         private void BtnEliminar_Click(object sender, RoutedEventArgs e)
         {
             if (dgEmpleados.SelectedItem is Empleado emp)
             {
-                // Seguridad: No auto-eliminación
-                if (SesionActual.Usuario != null && SesionActual.Usuario.Id == emp.Id)
+                if (SesionActual.Usuario?.Id == emp.Id)
                 {
-                    MessageBox.Show("PROTOCOL DENIED: No puede desactivar su propio perfil administrativo.", "SECURITY ALERT");
+                    MessageBox.Show("PROTOCOL DENIED: No puede desactivar su propio perfil.", "SECURITY ALERT");
                     return;
                 }
 
-                var confirm = MessageBox.Show(
-                    $"¿CONFIRMA DESACTIVACIÓN DEL AGENTE?\n\nNombre: {emp.Nombre} {emp.Apellido}\nMatrícula: {emp.Matricula}",
-                    "CONFIRMACIÓN DE BAJA",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Warning
-                );
-
-                if (confirm == MessageBoxResult.Yes)
+                if (MessageBox.Show($"¿DESACTIVAR AGENTE {emp.Matricula}?", "CONFIRMAR", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
                 {
-                    try
-                    {
-                        // Llama al DataService que ya tiene el UPDATE SQL
-                        DataService.EliminarEmpleado(emp.Id);
-
-                        // Refrescamos la vista
-                        CargarDatosDesdeDB();
-
-                        MessageBox.Show("AGENTE DESACTIVADO CORRECTAMENTE.", "LOG: ÉXITO");
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("FALLO EN OPERACIÓN: " + ex.Message);
-                    }
+                    DataService.EliminarEmpleado(emp.Id);
+                    CargarDatosDesdeDB();
                 }
-            }
-            else
-            {
-                MessageBox.Show("Seleccione un agente del roster.");
             }
         }
 
@@ -118,25 +123,8 @@ namespace Secorvi
         {
             if (dgEmpleados.SelectedItem is Empleado emp)
             {
-                // Invertimos el rol actual
-                bool nuevoEstado = !emp.EsAdmin;
-                string rango = nuevoEstado ? "ADMINISTRADOR" : "AGENTE OPERATIVO";
-
-                var result = MessageBox.Show($"¿Cambiar rango de {emp.Nombre} a {rango}?", "GESTIÓN DE ROLES", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes)
-                {
-                    try
-                    {
-                        DataService.CambiarPermisos(emp.Id, nuevoEstado);
-                        CargarDatosDesdeDB();
-                        MessageBox.Show("RANGO ACTUALIZADO.", "SISTEMA");
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Error: " + ex.Message);
-                    }
-                }
+                DataService.CambiarPermisos(emp.Id, !emp.EsAdmin);
+                CargarDatosDesdeDB();
             }
         }
 
@@ -146,13 +134,7 @@ namespace Secorvi
         private void AbrirCalendarioSeleccionado()
         {
             if (dgEmpleados.SelectedItem is Empleado emp)
-            {
-                NavigationService?.Navigate(new CalendarioEmpleado(emp));
-            }
-            else
-            {
-                MessageBox.Show("Seleccione un agente para desplegar calendario.");
-            }
+                this.NavigationService?.Navigate(new CalendarioEmpleado(emp));
         }
     }
 }

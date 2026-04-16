@@ -138,7 +138,7 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTextColumn Header="AGENTE" Binding="{Binding Nombre}" Width="200">
+                    <DataGridTextColumn Header="AGENTE" Binding="{Binding NombreCompleto}" Width="200">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="VerticalAlignment" Value="Center"/>
@@ -148,6 +148,36 @@
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
+
+                    <DataGridTemplateColumn Header="ASISTENCIA HOY" Width="135">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Border x:Name="brdAsistencia" Width="22" Height="22" CornerRadius="11" BorderThickness="2">
+                                        <TextBlock x:Name="txtIcono" Text="×" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Black" FontSize="12" Margin="0,0,0,1"/>
+                                    </Border>
+                                    <TextBlock x:Name="txtEstadoAsistencia" Text="PENDIENTE" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="10" FontWeight="Black" FontFamily="Consolas"/>
+                                </StackPanel>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding CumplioAsistenciaHoy}" Value="True">
+                                        <Setter TargetName="brdAsistencia" Property="Background" Value="#1A2E21"/>
+                                        <Setter TargetName="brdAsistencia" Property="BorderBrush" Value="#2ECC71"/>
+                                        <Setter TargetName="txtIcono" Property="Text" Value="✓"/>
+                                        <Setter TargetName="txtIcono" Property="Foreground" Value="#2ECC71"/>
+                                        <Setter TargetName="txtEstadoAsistencia" Property="Text" Value="CUMPLIÓ"/>
+                                        <Setter TargetName="txtEstadoAsistencia" Property="Foreground" Value="#2ECC71"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding CumplioAsistenciaHoy}" Value="False">
+                                        <Setter TargetName="brdAsistencia" Property="Background" Value="#2D1B1E"/>
+                                        <Setter TargetName="brdAsistencia" Property="BorderBrush" Value="#E74C3C"/>
+                                        <Setter TargetName="txtIcono" Property="Foreground" Value="#E74C3C"/>
+                                        <Setter TargetName="txtEstadoAsistencia" Property="Text" Value="FALTA"/>
+                                        <Setter TargetName="txtEstadoAsistencia" Property="Foreground" Value="#E74C3C"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
 
                     <DataGridTemplateColumn Header="ESTADO DE ASISTENCIA (WHATSAPP)" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
