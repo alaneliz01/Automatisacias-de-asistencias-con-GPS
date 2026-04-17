@@ -16,8 +16,6 @@ namespace Secorvi
         public static List<Turno> Turnos { get; set; } = new List<Turno>();
         public static List<Asignacion> Asignaciones { get; set; } = new List<Asignacion>();
 
-        public static void GuardarTodo() => ActualizarTodo();
-
         public static void ActualizarTodo()
         {
             try
@@ -280,7 +278,24 @@ namespace Secorvi
             }
             CargarAsignaciones();
         }
-
+        public static void EliminarUbicaciones(List<Ubicacion> lista)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                foreach (var ubi in lista)
+                {
+                    // Borrado físico de la tabla ubicaciones
+                    string query = "DELETE FROM ubicaciones WHERE id = @id";
+                    using (var cmd = new MySqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@id", ubi.Id);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            CargarUbicaciones();
+        }
         public static void EliminarAsignacionPorFecha(int idEmpleado, DateTime fecha)
         {
             using (var conn = new MySqlConnection(connectionString))

@@ -18,7 +18,7 @@ namespace Secorvi
         {
             try
             {
-                // Cargamos todo desde MySQL al arrancar
+
                 DataService.ActualizarTodo();
 
                 if (DataService.Empleados.Count == 0)
@@ -42,8 +42,6 @@ namespace Secorvi
                 MostrarAviso("CRITICAL: Ingrese usuario y contraseña", "#FFF3CD", "#856404");
                 return;
             }
-
-            DataService.CargarEmpleados();
 
             var encontrado = DataService.Empleados.FirstOrDefault(x =>
                 x.Usuario.Equals(userDigitado, StringComparison.OrdinalIgnoreCase) &&

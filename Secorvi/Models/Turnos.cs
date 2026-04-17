@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Secorvi.Models
+﻿namespace Secorvi.Models
 {
     public class Turno
     {
@@ -8,6 +6,5 @@ namespace Secorvi.Models
         public string Nombre { get; set; }
         public TimeSpan HoraInicio { get; set; }
         public TimeSpan HoraFin { get; set; }
-        public string HorarioTexto => $"{HoraInicio:hh\\:mm} - {HoraFin:hh\\:mm}";
     }
 }

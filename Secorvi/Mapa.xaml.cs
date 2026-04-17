@@ -256,8 +256,28 @@ namespace Secorvi
         private void BtnEliminarVarios_Click(object sender, RoutedEventArgs e)
         {
             var items = lstUbicaciones.SelectedItems.Cast<Ubicacion>().ToList();
-            foreach (var i in items) DataService.Ubicaciones.Remove(i);
-            DataService.GuardarTodo(); RefrescarListaUbicaciones();
+
+            if (items.Count == 0)
+            {
+                MessageBox.Show("Seleccione al menos una ubicación para eliminar.");
+                return;
+            }
+            var confirm = MessageBox.Show($"¿Desea eliminar {items.Count} ubicaciones permanentemente?",
+                                         "CONFIRMAR ELIMINACIÓN", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+            if (confirm == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    DataService.EliminarUbicaciones(items);
+                    RefrescarListaUbicaciones();
+                    MessageBox.Show("Ubicaciones eliminadas de la base de datos.");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error al eliminar: " + ex.Message);
+                }
+            }
         }
         private void BtnCancelarSeleccion_Click(object sender, RoutedEventArgs e) => lstUbicaciones.UnselectAll();
         private void BtnCancelar_Click(object sender, RoutedEventArgs e) => this.Close();

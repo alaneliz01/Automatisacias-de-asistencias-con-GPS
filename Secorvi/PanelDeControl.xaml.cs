@@ -73,7 +73,7 @@ namespace Secorvi
         }
 
 
-        // este es el filtro de busqueda, se ejecuta cada vez que el texto cambia en el txtBusqueda
+
         private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
         {
             string filtro = txtBusqueda.Text?.Trim().ToLower() ?? "";
