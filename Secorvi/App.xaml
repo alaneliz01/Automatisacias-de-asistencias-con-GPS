@@ -4,6 +4,6 @@
              xmlns:local="clr-namespace:Secorvi"
              StartupUri="Login.xaml">
     <Application.Resources>
-         
+
     </Application.Resources>
 </Application>

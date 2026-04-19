@@ -109,7 +109,7 @@
                       MouseDoubleClick="DgEmpleados_MouseDoubleClick" BorderThickness="0">
                 <DataGrid.Columns>
 
-                    <DataGridTextColumn Header="MATRÍCULA" Binding="{Binding Matricula}" Width="110">
+                    <DataGridTextColumn Header="MATRÍCULA" Binding="{Binding matricula}" Width="110">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="Foreground" Value="#FFB300"/>
@@ -121,24 +121,7 @@
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
 
-                    <DataGridTemplateColumn Header="RANGO" Width="110">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Border x:Name="brdRango" Background="#0F111A" BorderThickness="1" CornerRadius="2" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Center" BorderBrush="#4B5563">
-                                    <TextBlock x:Name="txtRango" Text="AGENTE" Foreground="#4B5563" FontSize="9" FontWeight="Black" FontFamily="Consolas"/>
-                                </Border>
-                                <DataTemplate.Triggers>
-                                    <DataTrigger Binding="{Binding EsAdmin}" Value="True">
-                                        <Setter TargetName="txtRango" Property="Text" Value="ADMIN"/>
-                                        <Setter TargetName="txtRango" Property="Foreground" Value="#FFB300"/>
-                                        <Setter TargetName="brdRango" Property="BorderBrush" Value="#FFB300"/>
-                                    </DataTrigger>
-                                </DataTemplate.Triggers>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTextColumn Header="AGENTE" Binding="{Binding NombreCompleto}" Width="200">
+                    <DataGridTextColumn Header="AGENTE" Binding="{Binding nombre_completo}" Width="200">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="VerticalAlignment" Value="Center"/>
@@ -149,45 +132,15 @@
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
 
-                    <DataGridTemplateColumn Header="ASISTENCIA HOY" Width="135">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Border x:Name="brdAsistencia" Width="22" Height="22" CornerRadius="11" BorderThickness="2">
-                                        <TextBlock x:Name="txtIcono" Text="×" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Black" FontSize="12" Margin="0,0,0,1"/>
-                                    </Border>
-                                    <TextBlock x:Name="txtEstadoAsistencia" Text="PENDIENTE" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="10" FontWeight="Black" FontFamily="Consolas"/>
-                                </StackPanel>
-                                <DataTemplate.Triggers>
-                                    <DataTrigger Binding="{Binding CumplioAsistenciaHoy}" Value="True">
-                                        <Setter TargetName="brdAsistencia" Property="Background" Value="#1A2E21"/>
-                                        <Setter TargetName="brdAsistencia" Property="BorderBrush" Value="#2ECC71"/>
-                                        <Setter TargetName="txtIcono" Property="Text" Value="✓"/>
-                                        <Setter TargetName="txtIcono" Property="Foreground" Value="#2ECC71"/>
-                                        <Setter TargetName="txtEstadoAsistencia" Property="Text" Value="CUMPLIÓ"/>
-                                        <Setter TargetName="txtEstadoAsistencia" Property="Foreground" Value="#2ECC71"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding CumplioAsistenciaHoy}" Value="False">
-                                        <Setter TargetName="brdAsistencia" Property="Background" Value="#2D1B1E"/>
-                                        <Setter TargetName="brdAsistencia" Property="BorderBrush" Value="#E74C3C"/>
-                                        <Setter TargetName="txtIcono" Property="Foreground" Value="#E74C3C"/>
-                                        <Setter TargetName="txtEstadoAsistencia" Property="Text" Value="FALTA"/>
-                                        <Setter TargetName="txtEstadoAsistencia" Property="Foreground" Value="#E74C3C"/>
-                                    </DataTrigger>
-                                </DataTemplate.Triggers>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
                     <DataGridTemplateColumn Header="ESTADO DE ASISTENCIA (WHATSAPP)" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Border Background="#161920" CornerRadius="4" Padding="12,5" Margin="10,5" BorderThickness="1" BorderBrush="#2D323E">
                                     <DockPanel>
-                                        <Ellipse Width="8" Height="8" Fill="{Binding ColorStatus}" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                        <Ellipse Width="8" Height="8" Fill="#2ECC71" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="10,0,0,0"/>
                                         <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding UltimoReporteHora}" Foreground="{Binding ColorStatus}" FontSize="11" FontWeight="Bold"/>
-                                            <TextBlock Text="{Binding UltimoReporteUbicacion}" Foreground="#6B7280" FontSize="10"/>
+                                            <TextBlock Text="CONEXIÓN ACTIVA" Foreground="#2ECC71" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="Reporte sincronizado con n8n" Foreground="#6B7280" FontSize="10"/>
                                         </StackPanel>
                                     </DockPanel>
                                 </Border>
@@ -198,21 +151,8 @@
                     <DataGridTemplateColumn Header="ACCIONES" Width="140">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Button Content="📅 CALENDARIO" 
-                                        Click="BtnCalendario_Click"
-                                        Background="Transparent" BorderBrush="#FFB300" Foreground="#FFB300" 
-                                        FontSize="10" FontWeight="Bold" Padding="8,4" Cursor="Hand"
-                                        VerticalAlignment="Center" HorizontalAlignment="Center">
-                                    <Button.Style>
-                                        <Style TargetType="Button">
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="#2D323E"/>
-                                                </Trigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
+                                <Button Content="📅 CALENDARIO" Click="BtnCalendario_Click" Style="{StaticResource IndustrialButtonStyle}" 
+                                        Foreground="#FFB300" BorderBrush="#FFB300" FontSize="10" FontWeight="Bold"/>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
@@ -229,19 +169,12 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="ESTADOS DE ASISTENCIA:" Foreground="#4B5563" FontSize="9" FontWeight="Black" Margin="0,0,15,0" VerticalAlignment="Center"/>
-
+                    <TextBlock Text="ESTADOS:" Foreground="#4B5563" FontSize="9" FontWeight="Black" Margin="0,0,15,0" VerticalAlignment="Center"/>
                     <Ellipse Width="8" Height="8" Fill="#2ECC71" Margin="0,0,5,0"/>
                     <TextBlock Text="EN PUNTO" Foreground="#E0E0E0" FontSize="9" Margin="0,0,15,0" VerticalAlignment="Center"/>
-
-                    <Ellipse Width="8" Height="8" Fill="#F1C40F" Margin="0,0,5,0"/>
-                    <TextBlock Text="REPORTE FUERA" Foreground="#E0E0E0" FontSize="9" Margin="0,0,15,0" VerticalAlignment="Center"/>
-
                     <Ellipse Width="8" Height="8" Fill="#E74C3C" Margin="0,0,5,0"/>
                     <TextBlock Text="SIN REPORTE" Foreground="#E0E0E0" FontSize="9" Margin="0,0,15,0" VerticalAlignment="Center"/>
-
                     <Rectangle Width="1" Fill="#2D323E" Margin="10,2" Height="15"/>
-
                     <TextBlock Text="🖱️ DOBLE CLIC: Abrir Calendario" Foreground="#6B7280" FontSize="9" Margin="15,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
 
@@ -249,7 +182,7 @@
                     <TextBlock Text="ENGINE:" Foreground="#4B5563" FontSize="9" FontWeight="Black" VerticalAlignment="Center"/>
                     <TextBlock Text=" n8n ACTIVE" Foreground="#2ECC71" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="5,0,0,0"/>
                     <Rectangle Width="1" Fill="#2D323E" Margin="15,2" Height="15"/>
-                    <TextBlock Text="SECORVI v2.0" Foreground="#FFB300" FontSize="10" FontWeight="Black" VerticalAlignment="Center"/>
+                    <TextBlock Text="SECORVI v2.1" Foreground="#FFB300" FontSize="10" FontWeight="Black" VerticalAlignment="Center"/>
                 </StackPanel>
             </Grid>
         </Border>

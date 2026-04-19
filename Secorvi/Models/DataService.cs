@@ -8,7 +8,6 @@ namespace Secorvi
 {
     public static class DataService
     {
-        // Cadena de conexión única para todo el servicio
         private static string connectionString = "Server=localhost;Database=secorvi_db;Uid=root;Pwd=2037888;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
 
         public static List<Empleado> Empleados { get; set; } = new List<Empleado>();
@@ -40,20 +39,20 @@ namespace Secorvi
 
         private static void CrearTurnoSistemaSiNoExiste(string nombreEstado)
         {
-            if (!Turnos.Any(t => t.Nombre.Equals(nombreEstado, StringComparison.OrdinalIgnoreCase)))
+            // t.nombre en minúsculas
+            if (!Turnos.Any(t => t.nombre.Equals(nombreEstado, StringComparison.OrdinalIgnoreCase)))
             {
                 Turno nuevo = new Turno
                 {
-                    Nombre = nombreEstado,
-                    HoraInicio = new TimeSpan(0, 0, 0),
-                    HoraFin = new TimeSpan(23, 59, 59)
+                    nombre = nombreEstado, // minúscula
+                    hora_inicio = new TimeSpan(0, 0, 0), // minúscula
+                    hora_fin = new TimeSpan(23, 59, 59) // minúscula
                 };
                 AgregarTurno(nuevo);
             }
         }
 
         // --- GESTIÓN DE EMPLEADOS ---
-
         public static void CargarEmpleados()
         {
             Empleados.Clear();
@@ -62,24 +61,22 @@ namespace Secorvi
                 try
                 {
                     conn.Open();
-                    // Seleccionamos también cumplio_asistencia_hoy para el Panel
-                    var cmd = new MySqlCommand("SELECT * FROM empleados WHERE activo = 1", conn);
+                    // Sincronizado con columna 'estatus' (ENUM)
+                    var cmd = new MySqlCommand("SELECT * FROM empleados WHERE estatus = 'Activo'", conn);
                     using (var r = cmd.ExecuteReader())
                     {
                         while (r.Read())
                         {
                             Empleados.Add(new Empleado
                             {
-                                Id = r["id"] != DBNull.Value ? Convert.ToInt32(r["id"]) : 0,
-                                Nombre = r["nombre"]?.ToString() ?? "",
-                                Apellido = r["apellido"]?.ToString() ?? "",
-                                Matricula = r["matricula"]?.ToString() ?? "",
-                                Telefono = r["telefono"]?.ToString() ?? "",
-                                Usuario = r["usuario"]?.ToString() ?? "",
-                                Contrasena = r["contrasena"]?.ToString() ?? "",
-                                Rol = r["rol"]?.ToString() ?? "AGENTE",
-                                Activo = r["activo"] != DBNull.Value && Convert.ToBoolean(r["activo"]),
-                                CumplioAsistenciaHoy = r["cumplio_asistencia_hoy"] != DBNull.Value && Convert.ToBoolean(r["cumplio_asistencia_hoy"])
+                                id_empleado = Convert.ToInt32(r["id_empleado"]),
+                                nombre_completo = r["nombre_completo"]?.ToString() ?? "",
+                                matricula = r["matricula"]?.ToString() ?? "",
+                                telefono = r["telefono"]?.ToString() ?? "",
+                                usuario = r["usuario"]?.ToString() ?? "",
+                                contrasena = r["contrasena"]?.ToString() ?? "",
+                                id_rol = Convert.ToInt32(r["id_rol"]),
+                                estatus = r["estatus"]?.ToString() ?? "Activo"
                             });
                         }
                     }
@@ -92,17 +89,17 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = "INSERT INTO empleados (nombre, apellido, matricula, telefono, usuario, contrasena, rol, activo, cumplio_asistencia_hoy) " +
-                               "VALUES (@nom, @ape, @mat, @tel, @usu, @con, @rol, 1, 0)";
+                // Sincronizado con tabla empleados (id_rol, nombre_completo, estatus)
+                string query = "INSERT INTO empleados (nombre_completo, telefono, id_rol, estatus, usuario, contrasena, matricula) " +
+                               "VALUES (@nom, @tel, @rol, 'Activo', @usu, @con, @mat)";
 
                 var cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@nom", emp.Nombre);
-                cmd.Parameters.AddWithValue("@ape", emp.Apellido);
-                cmd.Parameters.AddWithValue("@mat", emp.Matricula);
-                cmd.Parameters.AddWithValue("@tel", emp.Telefono);
-                cmd.Parameters.AddWithValue("@usu", emp.Usuario);
-                cmd.Parameters.AddWithValue("@con", emp.Contrasena);
-                cmd.Parameters.AddWithValue("@rol", emp.Rol);
+                cmd.Parameters.AddWithValue("@nom", emp.nombre_completo);
+                cmd.Parameters.AddWithValue("@tel", emp.telefono);
+                cmd.Parameters.AddWithValue("@rol", emp.id_rol);
+                cmd.Parameters.AddWithValue("@usu", emp.usuario);
+                cmd.Parameters.AddWithValue("@con", emp.contrasena);
+                cmd.Parameters.AddWithValue("@mat", emp.matricula);
 
                 conn.Open();
                 cmd.ExecuteNonQuery();
@@ -114,7 +111,8 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = "UPDATE empleados SET activo = 0 WHERE id = @id";
+                // Cambiamos estatus a 'Inactivo' para no borrar físicamente (Safe Delete)
+                string query = "UPDATE empleados SET estatus = 'Inactivo' WHERE id_empleado = @id";
                 var cmd = new MySqlCommand(query, conn);
                 cmd.Parameters.AddWithValue("@id", id);
                 conn.Open();
@@ -123,25 +121,7 @@ namespace Secorvi
             CargarEmpleados();
         }
 
-        public static void CambiarPermisos(int id, bool hacerAdmin)
-        {
-            string nuevoRol = hacerAdmin ? "ADMIN" : "AGENTE";
-            using (var conexion = new MySqlConnection(connectionString))
-            {
-                conexion.Open();
-                string sql = "UPDATE empleados SET rol = @rol WHERE id = @id";
-                using (var cmd = new MySqlCommand(sql, conexion))
-                {
-                    cmd.Parameters.AddWithValue("@rol", nuevoRol);
-                    cmd.Parameters.AddWithValue("@id", id);
-                    cmd.ExecuteNonQuery();
-                }
-            }
-            CargarEmpleados();
-        }
-
         // --- GESTIÓN DE UBICACIONES ---
-
         public static void CargarUbicaciones()
         {
             Ubicaciones.Clear();
@@ -157,12 +137,11 @@ namespace Secorvi
                         {
                             Ubicaciones.Add(new Ubicacion
                             {
-                                Id = Convert.ToInt32(r["id"]),
-                                Nombre = r["nombre"]?.ToString(),
-                                Latitud = Convert.ToDouble(r["latitud"]),
-                                Longitud = Convert.ToDouble(r["longitud"]),
-                                RadioPermitido = Convert.ToDouble(r["radio_permitido"]),
-                                Activo = Convert.ToBoolean(r["activo"])
+                                id_lugar = Convert.ToInt32(r["id_lugar"]),
+                                nombre_lugar = r["nombre_lugar"]?.ToString(),
+                                latitud = Convert.ToDecimal(r["latitud"]),
+                                longitud = Convert.ToDecimal(r["longitud"]),
+                                radio_permitido = Convert.ToInt32(r["radio_permitido"])
                             });
                         }
                     }
@@ -175,12 +154,12 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = "INSERT INTO ubicaciones (nombre, latitud, longitud, radio_permitido, activo) VALUES (@nom, @lat, @lng, @rad, 1)";
+                string query = "INSERT INTO ubicaciones (nombre_lugar, latitud, longitud, radio_permitido) VALUES (@nom, @lat, @lng, @rad)";
                 var cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@nom", u.Nombre);
-                cmd.Parameters.AddWithValue("@lat", u.Latitud);
-                cmd.Parameters.AddWithValue("@lng", u.Longitud);
-                cmd.Parameters.AddWithValue("@rad", u.RadioPermitido);
+                cmd.Parameters.AddWithValue("@nom", u.nombre_lugar);
+                cmd.Parameters.AddWithValue("@lat", u.latitud);
+                cmd.Parameters.AddWithValue("@lng", u.longitud);
+                cmd.Parameters.AddWithValue("@rad", u.radio_permitido);
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -188,7 +167,6 @@ namespace Secorvi
         }
 
         // --- GESTIÓN DE TURNOS ---
-
         public static void CargarTurnos()
         {
             Turnos.Clear();
@@ -204,10 +182,12 @@ namespace Secorvi
                         {
                             Turnos.Add(new Turno
                             {
-                                Id = Convert.ToInt32(r["id"]),
-                                Nombre = r["nombre"].ToString(),
-                                HoraInicio = (TimeSpan)r["hora_inicio"],
-                                HoraFin = (TimeSpan)r["hora_fin"]
+                                id_turno = Convert.ToInt32(r["id_turno"]),
+                                id_lugar = r["id_lugar"] != DBNull.Value ? (int?)Convert.ToInt32(r["id_lugar"]) : null,
+                                id_empleado = r["id_empleado"] != DBNull.Value ? (int?)Convert.ToInt32(r["id_empleado"]) : null,
+                                nombre = r["nombre"].ToString(),
+                                hora_inicio = (TimeSpan)r["hora_inicio"],
+                                hora_fin = (TimeSpan)r["hora_fin"]
                             });
                         }
                     }
@@ -220,11 +200,14 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = "INSERT INTO turnos (nombre, hora_inicio, hora_fin) VALUES (@nom, @ini, @fin)";
+                string query = "INSERT INTO turnos (id_lugar, id_empleado, nombre, hora_inicio, hora_fin) VALUES (@lug, @emp, @nom, @ini, @fin)";
                 var cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@nom", t.Nombre);
-                cmd.Parameters.AddWithValue("@ini", t.HoraInicio);
-                cmd.Parameters.AddWithValue("@fin", t.HoraFin);
+                // CORRECCIÓN: t.id_lugar, t.id_empleado, t.nombre, etc. (todo minúscula)
+                cmd.Parameters.AddWithValue("@lug", (object)t.id_lugar ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@emp", (object)t.id_empleado ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@nom", t.nombre);
+                cmd.Parameters.AddWithValue("@ini", t.hora_inicio);
+                cmd.Parameters.AddWithValue("@fin", t.hora_fin);
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -232,7 +215,6 @@ namespace Secorvi
         }
 
         // --- GESTIÓN DE ASIGNACIONES ---
-
         public static void CargarAsignaciones()
         {
             Asignaciones.Clear();
@@ -248,17 +230,17 @@ namespace Secorvi
                         {
                             Asignaciones.Add(new Asignacion
                             {
-                                Id = Convert.ToInt32(r["id"]),
-                                IdEmpleado = Convert.ToInt32(r["id_empleado"]),
-                                IdUbicacion = r["id_ubicacion"] != DBNull.Value ? Convert.ToInt32(r["id_ubicacion"]) : 0,
-                                IdTurno = Convert.ToInt32(r["id_turno"]),
-                                Fecha = Convert.ToDateTime(r["fecha"]),
-                                Estatus = r["estatus"]?.ToString() ?? "PENDIENTE"
+                                id_asignaciones = Convert.ToInt32(r["id_asignaciones"]),
+                                id_empleado = Convert.ToInt32(r["id_empleado"]),
+                                id_ubicacion = r["id_ubicacion"] != DBNull.Value ? Convert.ToInt32(r["id_ubicacion"]) : 0,
+                                id_turno = r["id_turno"] != DBNull.Value ? Convert.ToInt32(r["id_turno"]) : 0, // Crucial para el calendario
+                                fecha = Convert.ToDateTime(r["fecha"]),
+                                estatus = r["estatus"]?.ToString() ?? "PROGRAMADO"
                             });
                         }
                     }
                 }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Error CargarAsignaciones: " + ex.Message); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Error: " + ex.Message); }
             }
         }
 
@@ -266,18 +248,23 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = "INSERT INTO asignaciones (id_empleado, id_ubicacion, id_turno, fecha, estatus) VALUES (@emp, @ubi, @tur, @fec, @est)";
+                // Asegúrate de que 'asignaciones' esté escrito igual que en tu DB
+                string query = "INSERT INTO asignaciones (id_empleado, id_ubicacion, id_turno, fecha, estatus) " +
+                               "VALUES (@emp, @ubi, @tur, @fec, @est)";
+
                 var cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@emp", a.IdEmpleado);
-                cmd.Parameters.AddWithValue("@ubi", a.IdUbicacion == 0 ? (object)DBNull.Value : a.IdUbicacion);
-                cmd.Parameters.AddWithValue("@tur", a.IdTurno);
-                cmd.Parameters.AddWithValue("@fec", a.Fecha);
-                cmd.Parameters.AddWithValue("@est", a.Estatus);
+                cmd.Parameters.AddWithValue("@emp", a.id_empleado);
+                cmd.Parameters.AddWithValue("@ubi", a.id_ubicacion == 0 ? (object)DBNull.Value : a.id_ubicacion);
+                cmd.Parameters.AddWithValue("@tur", a.id_turno); // Ahora sí enviamos el turno
+                cmd.Parameters.AddWithValue("@fec", a.fecha);
+                cmd.Parameters.AddWithValue("@est", a.estatus);
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
             CargarAsignaciones();
         }
+
         public static void EliminarUbicaciones(List<Ubicacion> lista)
         {
             using (var conn = new MySqlConnection(connectionString))
@@ -285,17 +272,17 @@ namespace Secorvi
                 conn.Open();
                 foreach (var ubi in lista)
                 {
-                    // Borrado físico de la tabla ubicaciones
-                    string query = "DELETE FROM ubicaciones WHERE id = @id";
+                    string query = "DELETE FROM ubicaciones WHERE id_lugar = @id";
                     using (var cmd = new MySqlCommand(query, conn))
                     {
-                        cmd.Parameters.AddWithValue("@id", ubi.Id);
+                        cmd.Parameters.AddWithValue("@id", ubi.id_lugar);
                         cmd.ExecuteNonQuery();
                     }
                 }
             }
             CargarUbicaciones();
         }
+
         public static void EliminarAsignacionPorFecha(int idEmpleado, DateTime fecha)
         {
             using (var conn = new MySqlConnection(connectionString))
@@ -308,6 +295,67 @@ namespace Secorvi
                 cmd.ExecuteNonQuery();
             }
             CargarAsignaciones();
+        }
+        public static void CambiarPermisos(int idEmpleado, bool hacerAdmin)
+        {
+            int nuevoRol = hacerAdmin ? 1 : 3;
+
+            using (var conexion = new MySqlConnection(connectionString))
+            {
+                try
+                {
+                    conexion.Open();
+      
+                    string sql = "UPDATE empleados SET id_rol = @rol WHERE id_empleado = @id";
+                    using (var cmd = new MySqlCommand(sql, conexion))
+                    {
+                        cmd.Parameters.AddWithValue("@rol", nuevoRol);
+                        cmd.Parameters.AddWithValue("@id", idEmpleado);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Error en CambiarPermisos: " + ex.Message);
+                }
+            }
+            CargarEmpleados(); 
+        }
+        public static int PurgarRegistrosAntiguos(int mesesAntiguedad)
+        {
+            int filasBorradas = 0;
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                using (var trans = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        string sqlAsistencias = "DELETE FROM asistencias WHERE fecha_inicio < DATE_SUB(NOW(), INTERVAL @meses MONTH)";
+                        using (var cmd = new MySqlCommand(sqlAsistencias, conn, trans))
+                        {
+                            cmd.Parameters.AddWithValue("@meses", mesesAntiguedad);
+                            filasBorradas += cmd.ExecuteNonQuery();
+                        }
+
+                        string sqlAsignaciones = "DELETE FROM asignaciones WHERE fecha < DATE_SUB(NOW(), INTERVAL @meses MONTH)";
+                        using (var cmd = new MySqlCommand(sqlAsignaciones, conn, trans))
+                        {
+                            cmd.Parameters.AddWithValue("@meses", mesesAntiguedad);
+                            filasBorradas += cmd.ExecuteNonQuery();
+                        }
+
+                        trans.Commit();
+                        return filasBorradas;
+                    }
+                    catch (Exception ex)
+                    {
+                        trans.Rollback();
+                        System.Diagnostics.Debug.WriteLine("Error en Purga: " + ex.Message);
+                        return -1;
+                    }
+                }
+            }
         }
     }
 }

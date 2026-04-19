@@ -1,14 +1,29 @@
-﻿namespace Secorvi.Models
+﻿using System;
+
+namespace Secorvi.Models
 {
     public class Asistencia
     {
-        public int Id { get; set; }
+        public int IdRegistro { get; set; }
+
         public int IdEmpleado { get; set; }
+
+        // Coincide con fecha_inicio (DATE)
         public DateTime FechaInicio { get; set; }
-        public DateTime? FechaFinal { get; set; }
-        public string Estatus { get; set; }     
+
+        // Coincide con hora_inicio (TIME)
+        public TimeSpan HoraInicio { get; set; }
+
+        public DateTime? FechaFin { get; set; }
+        public TimeSpan? HoraFin { get; set; }
+
+        public string MetodoRegistro { get; set; } = "GPS";
+        public string Estado { get; set; } = "Entrada";
+
         public double Latitud { get; set; }
         public double Longitud { get; set; }
-        public string Incidentes { get; set; }
+
+        // Coincide con link_mapa de tu SQL
+        public string? LinkMapa { get; set; }
     }
 }

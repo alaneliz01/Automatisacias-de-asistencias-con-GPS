@@ -2,10 +2,13 @@
 using System.Collections.Generic;
 using System.Text;
 
-public class Cliente
+namespace Secorvi.Models
 {
-    public int Id { get; set; }
-    public string Nombre { get; set; }
-    public string Contacto { get; set; } 
-    public string Telefono { get; set; }
+    public class Cliente
+    {
+        public int IdCliente { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+        public string? Telefono { get; set; }
+        public string? Ubicacion { get; set; }
+    }
 }

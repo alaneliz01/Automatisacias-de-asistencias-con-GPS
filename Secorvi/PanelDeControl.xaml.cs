@@ -27,11 +27,7 @@ namespace Secorvi
 
         private void PanelDeControl_Unloaded(object sender, RoutedEventArgs e)
         {
-
-            if (_autoRefreshTimer != null)
-            {
-                _autoRefreshTimer.Stop();
-            }
+            _autoRefreshTimer?.Stop();
         }
 
         private void ConfigurarAutoRefresco()
@@ -44,76 +40,77 @@ namespace Secorvi
             }
 
             if (!_autoRefreshTimer.IsEnabled)
-            {
                 _autoRefreshTimer.Start();
-            }
         }
 
         private void CargarDatosDesdeDB()
         {
             try
             {
+                // Refresco masivo de datos desde MySQL
                 DataService.ActualizarTodo();
+
+                // Enlazamos al DataGrid (dgEmpleados)
                 dgEmpleados.ItemsSource = null;
                 dgEmpleados.ItemsSource = DataService.Empleados;
 
-                int totalAsistencias = DataService.Empleados.Count(x => x.CumplioAsistenciaHoy);
-                ActualizarContador(DataService.Empleados.Count, totalAsistencias);
+                // Actualizamos el contador de registros del diseño
+                if (lblTotal != null)
+                {
+                    lblTotal.Text = $"Registros: {DataService.Empleados.Count}";
+                }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("Error en refresh: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("OCC_LOG: Error en refresco automático: " + ex.Message);
             }
         }
-
-        private void ActualizarContador(int total, int asistencias)
-        {
-            if (lblTotal != null)
-                lblTotal.Text = $"AGENTES ACTIVOS: {total} | ASISTENCIAS HOY: {asistencias}";
-        }
-
-
 
         private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
         {
             string filtro = txtBusqueda.Text?.Trim().ToLower() ?? "";
+
             if (string.IsNullOrEmpty(filtro))
             {
                 dgEmpleados.ItemsSource = DataService.Empleados;
-                ActualizarContador(DataService.Empleados.Count, DataService.Empleados.Count(x => x.CumplioAsistenciaHoy));
                 return;
             }
 
+            // Búsqueda en los campos del modelo en minúsculas
             var filtrados = DataService.Empleados.Where(x =>
-                (x.Nombre?.ToLower().Contains(filtro) ?? false) ||
-                (x.Apellido?.ToLower().Contains(filtro) ?? false) ||
-                (x.Matricula?.ToLower().Contains(filtro) ?? false)
+                (x.nombre_completo?.ToLower().Contains(filtro) ?? false) ||
+                (x.matricula?.ToLower().Contains(filtro) ?? false) ||
+                (x.telefono?.Contains(filtro) ?? false)
             ).ToList();
 
             dgEmpleados.ItemsSource = filtrados;
-            ActualizarContador(filtrados.Count, filtrados.Count(x => x.CumplioAsistenciaHoy));
         }
 
         private void BtnNuevo_Click(object sender, RoutedEventArgs e)
         {
             RegistroEmpleado ventanaRegistro = new RegistroEmpleado();
             ventanaRegistro.Owner = Window.GetWindow(this);
-            if (ventanaRegistro.ShowDialog() == true) CargarDatosDesdeDB();
+            if (ventanaRegistro.ShowDialog() == true)
+                CargarDatosDesdeDB();
         }
 
         private void BtnEliminar_Click(object sender, RoutedEventArgs e)
         {
             if (dgEmpleados.SelectedItem is Empleado emp)
             {
-                if (SesionActual.Usuario?.Id == emp.Id)
+                // Seguridad: No permitir que el admin activo se borre a sí mismo
+                if (SesionActual.Usuario?.id_empleado == emp.id_empleado)
                 {
-                    MessageBox.Show("PROTOCOL DENIED: No puede desactivar su propio perfil.", "SECURITY ALERT");
+                    MessageBox.Show("ACCESO DENEGADO: No puede dar de baja su propio acceso administrativo.", "SEGURIDAD SECORVI");
                     return;
                 }
 
-                if (MessageBox.Show($"¿DESACTIVAR AGENTE {emp.Matricula}?", "CONFIRMAR", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+                var res = MessageBox.Show($"¿CONFIRMAR BAJA DEFINITIVA DEL AGENTE {emp.nombre_completo}?",
+                    "OPERACIÓN DE BAJA", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+                if (res == MessageBoxResult.Yes)
                 {
-                    DataService.EliminarEmpleado(emp.Id);
+                    DataService.EliminarEmpleado(emp.id_empleado);
                     CargarDatosDesdeDB();
                 }
             }
@@ -123,18 +120,45 @@ namespace Secorvi
         {
             if (dgEmpleados.SelectedItem is Empleado emp)
             {
-                DataService.CambiarPermisos(emp.Id, !emp.EsAdmin);
+                bool esAdminActual = (emp.id_rol == 1);
+                string nuevoRol = esAdminActual ? "AGENTE" : "ADMINISTRADOR";
+
+                var res = MessageBox.Show($"¿CAMBIAR NIVEL DE ACCESO DE {emp.nombre_completo} A {nuevoRol}?",
+                    "GESTIÓN DE PERMISOS", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (res == MessageBoxResult.Yes)
+                {
+                    DataService.CambiarPermisos(emp.id_empleado, !esAdminActual);
+                    CargarDatosDesdeDB();
+                }
+            }
+        }
+
+        private void BtnMantenimiento_Click(object sender, RoutedEventArgs e)
+        {
+            if (!SesionActual.EsSuperAdmin) return;
+
+            var res = MessageBox.Show("¿EJECUTAR PURGA DE REGISTROS ANTIGUOS (6 MESES)?",
+                "MANTENIMIENTO DE SISTEMA", MessageBoxButton.YesNo, MessageBoxImage.Error);
+
+            if (res == MessageBoxResult.Yes)
+            {
+                int filas = DataService.PurgarRegistrosAntiguos(6);
+                MessageBox.Show($"OPTIMIZACIÓN FINALIZADA. {filas} REGISTROS ELIMINADOS.", "OCC_LOG");
                 CargarDatosDesdeDB();
             }
         }
 
         private void BtnCalendario_Click(object sender, RoutedEventArgs e) => AbrirCalendarioSeleccionado();
+
         private void DgEmpleados_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e) => AbrirCalendarioSeleccionado();
 
         private void AbrirCalendarioSeleccionado()
         {
             if (dgEmpleados.SelectedItem is Empleado emp)
+            {
                 this.NavigationService?.Navigate(new CalendarioEmpleado(emp));
+            }
         }
     }
 }

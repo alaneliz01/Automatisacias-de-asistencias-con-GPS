@@ -26,9 +26,10 @@ namespace Secorvi
 
             if (dpFecha != null) dpFecha.SelectedDate = _fechaAsignacion;
 
-            var emp = DataService.Empleados.FirstOrDefault(e => e.Id == _idEmpleadoPreseleccionado);
+            // SINCRONIZADO: id_empleado y nombre_completo
+            var emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == _idEmpleadoPreseleccionado);
             if (lblEmpleadoActivo != null)
-                lblEmpleadoActivo.Text = $"AGENTE: {(emp?.Nombre ?? "---").ToUpper()}";
+                lblEmpleadoActivo.Text = $"AGENTE: {(emp?.nombre_completo ?? "---").ToUpper()}";
 
             this.Loaded += async (s, e) => {
                 await InitMap();
@@ -42,6 +43,7 @@ namespace Secorvi
             {
                 await mapaWebView.EnsureCoreWebView2Async();
 
+                // Lógica de Leaflet intacta como pediste
                 string html = @"
 <!DOCTYPE html>
 <html>
@@ -52,43 +54,14 @@ namespace Secorvi
     <style>
         body { margin:0; padding:0; overflow: hidden; background: #0B0D12; font-family: 'Segoe UI', sans-serif; }
         #map { height:100vh; width: 100vw; z-index: 1; }
-        
-        /* FILTRO OSCURO TOTAL */
         .leaflet-tile { filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) !important; }
-
-        /* CONTENEDOR DEL BUSCADOR */
-        #search-panel {
-            position: absolute; top: 20px; right: 20px; z-index: 1000; width: 350px;
-        }
-
-        .search-bar {
-            position: relative; background: #1E222D; border: 2px solid #FFB300; border-radius: 12px;
-            padding: 4px 15px; box-shadow: 0 6px 20px rgba(0,0,0,0.6);
-        }
-
-        .search-bar input {
-            width: 100%; background: transparent; border: none; color: white;
-            padding: 12px 0; outline: none; font-size: 15px;
-        }
-
-        /* SUGERENCIAS NATIVAS MEJORADAS */
-        #suggestions-list {
-            background: #1E222D; border: 2px solid #303645; border-radius: 12px;
-            margin-top: 10px; max-height: 300px; overflow-y: auto; display: none;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.8);
-        }
-
-        .suggestion-item {
-            padding: 14px 16px; border-bottom: 1px solid #2A2E3B; color: #E5E7EB;
-            cursor: pointer; font-size: 14px; transition: all 0.2s;
-        }
-
-        .suggestion-item:hover, .suggestion-item.active {
-            background: #FFB300; color: #000;
-        }
-
+        #search-panel { position: absolute; top: 20px; right: 20px; z-index: 1000; width: 350px; }
+        .search-bar { position: relative; background: #1E222D; border: 2px solid #FFB300; border-radius: 12px; padding: 4px 15px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); }
+        .search-bar input { width: 100%; background: transparent; border: none; color: white; padding: 12px 0; outline: none; font-size: 15px; }
+        #suggestions-list { background: #1E222D; border: 2px solid #303645; border-radius: 12px; margin-top: 10px; max-height: 300px; overflow-y: auto; display: none; box-shadow: 0 12px 30px rgba(0,0,0,0.8); }
+        .suggestion-item { padding: 14px 16px; border-bottom: 1px solid #2A2E3B; color: #E5E7EB; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+        .suggestion-item:hover, .suggestion-item.active { background: #FFB300; color: #000; }
         .suggestion-item:last-child { border-bottom: none; }
-        
         .highlight { font-weight: bold; color: #FFB300; }
         .suggestion-item:hover .highlight, .suggestion-item.active .highlight { color: #000; }
     </style>
@@ -100,24 +73,19 @@ namespace Secorvi
         </div>
         <div id='suggestions-list'></div>
     </div>
-
     <div id='map'></div>
-
     <script>
         const map = L.map('map', { zoomControl: false }).setView([25.6844, -100.3161], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
         let marker, circle, debounceTimer;
         let activeIndex = -1;
         const searchInput = document.getElementById('searchInput');
         const list = document.getElementById('suggestions-list');
 
-        // LÓGICA DE BÚSQUEDA
         searchInput.oninput = (e) => {
             clearTimeout(debounceTimer);
             const query = e.target.value;
             if (query.length < 3) { list.style.display = 'none'; return; }
-            
             debounceTimer = setTimeout(async () => {
                 try {
                     const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&countrycodes=mx`);
@@ -135,11 +103,8 @@ namespace Secorvi
                 data.forEach((item, index) => {
                     const div = document.createElement('div');
                     div.className = 'suggestion-item';
-                    
-                    // Resaltar texto buscado
                     const regex = new RegExp(`(${query})`, 'gi');
                     div.innerHTML = item.display_name.replace(regex, ""<span class='highlight'>$1</span>"");
-                    
                     div.onclick = () => selectItem(item);
                     list.appendChild(div);
                 });
@@ -152,7 +117,6 @@ namespace Secorvi
             list.style.display = 'none';
         }
 
-        // NAVEGACIÓN CON TECLADO
         searchInput.onkeydown = (e) => {
             const items = list.getElementsByClassName('suggestion-item');
             if (e.key === 'ArrowDown') {
@@ -205,15 +169,17 @@ namespace Secorvi
         private void RefrescarListaUbicaciones()
         {
             lstUbicaciones.ItemsSource = null;
-            lstUbicaciones.ItemsSource = DataService.Ubicaciones.OrderBy(u => u.Nombre).ToList();
+            // SINCRONIZADO: nombre_lugar
+            lstUbicaciones.ItemsSource = DataService.Ubicaciones.OrderBy(u => u.nombre_lugar).ToList();
         }
 
         private void lstUbicaciones_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (lstUbicaciones.SelectedItem is Ubicacion u)
             {
-                txtNombrePunto.Text = u.Nombre;
-                _selectedLat = u.Latitud; _selectedLng = u.Longitud;
+                txtNombrePunto.Text = u.nombre_lugar;
+                _selectedLat = (double)u.latitud; // Casteo a double para compatibilidad con Leaflet
+                _selectedLng = (double)u.longitud;
                 txtCoords.Text = $"{_selectedLat:F6}, {_selectedLng:F6}";
                 mapaWebView.ExecuteScriptAsync($"window.updatePos({_selectedLat.ToString(CultureInfo.InvariantCulture)}, {_selectedLng.ToString(CultureInfo.InvariantCulture)})");
             }
@@ -229,25 +195,40 @@ namespace Secorvi
             {
                 DateTime dtI = DateTime.ParseExact(txtHoraInicio.Text.Trim(), "hh:mm tt", CultureInfo.InvariantCulture);
                 DateTime dtF = DateTime.ParseExact(txtHoraFin.Text.Trim(), "hh:mm tt", CultureInfo.InvariantCulture);
-                Ubicacion ubi = DataService.Ubicaciones.FirstOrDefault(u => u.Nombre == txtNombrePunto.Text.ToUpper()) ??
-                               new Ubicacion { Nombre = txtNombrePunto.Text.ToUpper(), Latitud = _selectedLat, Longitud = _selectedLng, Activo = true, RadioPermitido = 200 };
 
-                if (ubi.Id == 0) { DataService.AgregarUbicacion(ubi); DataService.CargarUbicaciones(); ubi = DataService.Ubicaciones.Last(); }
+                // SINCRONIZADO: id_lugar, nombre_lugar, latitud, longitud
+                Ubicacion ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == txtNombrePunto.Text.ToUpper()) ??
+                               new Ubicacion { nombre_lugar = txtNombrePunto.Text.ToUpper(), latitud = (decimal)_selectedLat, longitud = (decimal)_selectedLng, radio_permitido = 200 };
 
-                var t = DataService.Turnos.FirstOrDefault(x => x.HoraInicio == dtI.TimeOfDay && x.HoraFin == dtF.TimeOfDay) ??
-                        new Turno { Nombre = "PERSONALIZADO", HoraInicio = dtI.TimeOfDay, HoraFin = dtF.TimeOfDay };
+                if (ubi.id_lugar == 0)
+                {
+                    DataService.AgregarUbicacion(ubi);
+                    DataService.CargarUbicaciones();
+                    ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == txtNombrePunto.Text.ToUpper());
+                }
 
-                if (t.Id == 0) { DataService.AgregarTurno(t); DataService.CargarTurnos(); t = DataService.Turnos.Last(); }
+                // SINCRONIZADO: hora_inicio, hora_fin, id_turno, nombre
+                var t = DataService.Turnos.FirstOrDefault(x => x.hora_inicio == dtI.TimeOfDay && x.hora_fin == dtF.TimeOfDay) ??
+                        new Turno { nombre = "PERSONALIZADO", hora_inicio = dtI.TimeOfDay, hora_fin = dtF.TimeOfDay };
 
+                if (t.id_turno == 0)
+                {
+                    DataService.AgregarTurno(t);
+                    DataService.CargarTurnos();
+                    t = DataService.Turnos.Last();
+                }
+
+                // SINCRONIZADO: id_empleado, fecha (columna SQL), id_ubicacion, id_turno
                 DataService.EliminarAsignacionPorFecha(_idEmpleadoPreseleccionado, dpFecha.SelectedDate ?? DateTime.Today);
                 DataService.CrearAsignacion(new Asignacion
                 {
-                    IdEmpleado = _idEmpleadoPreseleccionado,
-                    IdUbicacion = ubi.Id,
-                    IdTurno = t.Id,
-                    Fecha = dpFecha.SelectedDate ?? DateTime.Today,
-                    Estatus = "PROGRAMADO"
+                    id_empleado = _idEmpleadoPreseleccionado,
+                    id_ubicacion = ubi.id_lugar,
+                    id_turno = t.id_turno,
+                    fecha = dpFecha.SelectedDate ?? DateTime.Today,
+                    estatus = "PROGRAMADO"
                 });
+
                 this.DialogResult = true; this.Close();
             }
             catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
@@ -256,27 +237,17 @@ namespace Secorvi
         private void BtnEliminarVarios_Click(object sender, RoutedEventArgs e)
         {
             var items = lstUbicaciones.SelectedItems.Cast<Ubicacion>().ToList();
+            if (items.Count == 0) return;
 
-            if (items.Count == 0)
-            {
-                MessageBox.Show("Seleccione al menos una ubicación para eliminar.");
-                return;
-            }
-            var confirm = MessageBox.Show($"¿Desea eliminar {items.Count} ubicaciones permanentemente?",
-                                         "CONFIRMAR ELIMINACIÓN", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-
+            var confirm = MessageBox.Show($"¿Desea eliminar {items.Count} ubicaciones?", "CONFIRMAR", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (confirm == MessageBoxResult.Yes)
             {
                 try
                 {
                     DataService.EliminarUbicaciones(items);
                     RefrescarListaUbicaciones();
-                    MessageBox.Show("Ubicaciones eliminadas de la base de datos.");
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Error al eliminar: " + ex.Message);
-                }
+                catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
             }
         }
         private void BtnCancelarSeleccion_Click(object sender, RoutedEventArgs e) => lstUbicaciones.UnselectAll();

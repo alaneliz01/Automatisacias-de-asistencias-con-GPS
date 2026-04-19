@@ -2,11 +2,11 @@
 {
     public class Asignacion
     {
-        public int Id { get; set; }
-        public int IdEmpleado { get; set; }
-        public int? IdUbicacion { get; set; }   
-        public int IdTurno { get; set; }
-        public DateTime Fecha { get; set; }
-        public string Estatus { get; set; }   
+        public int id_asignaciones { get; set; }
+        public int id_empleado { get; set; }
+        public int id_ubicacion { get; set; }
+        public int id_turno { get; set; } // Propiedad faltante
+        public DateTime fecha { get; set; }
+        public string estatus { get; set; }
     }
 }

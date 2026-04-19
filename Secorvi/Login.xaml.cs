@@ -18,7 +18,7 @@ namespace Secorvi
         {
             try
             {
-
+                // Esto carga la lista estática en DataService
                 DataService.ActualizarTodo();
 
                 if (DataService.Empleados.Count == 0)
@@ -43,28 +43,43 @@ namespace Secorvi
                 return;
             }
 
+            // BUSQUEDA: Usamos las propiedades en minúsculas (id_empleado, usuario, contrasena, estatus)
+            // tal como están en tus nuevos Models sincronizados con SQL.
             var encontrado = DataService.Empleados.FirstOrDefault(x =>
-                x.Usuario.Equals(userDigitado, StringComparison.OrdinalIgnoreCase) &&
-                x.Contrasena == passDigitada);
+                x.usuario.Equals(userDigitado, StringComparison.OrdinalIgnoreCase) &&
+                x.contrasena == passDigitada);
 
             if (encontrado != null)
             {
-                if (!encontrado.Activo)
+                // Validamos el ENUM de la base de datos ('Activo')
+                if (!encontrado.estatus.Equals("Activo", StringComparison.OrdinalIgnoreCase))
                 {
                     MostrarAviso("ACCESO DENEGADO: Usuario inactivo", "#F8D7DA", "#721C24");
                     return;
                 }
 
-                // Guardamos en la clase estática que verificamos antes
+                // --- INICIO DE SESIÓN ---
                 SesionActual.Usuario = encontrado;
 
-                ContenedorPrincipal principal = new ContenedorPrincipal();
-                principal.Show();
-                this.Close();
+                // Verificamos el rol según los IDs de tu script:
+                // 1 = Super Admin, 2 = Admin Empleados, 3 = Agente
+                if (encontrado.id_rol == 1 || encontrado.id_rol == 2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"LOG: Acceso concedido a {encontrado.nombre_completo} con Rol ID: {encontrado.id_rol}");
+
+                    ContenedorPrincipal principal = new ContenedorPrincipal();
+                    principal.Show();
+                    this.Close();
+                }
+                else
+                {
+                    // Si es un Agente (Rol 3), denegamos acceso al panel administrativo de escritorio
+                    MessageBox.Show("ACCESO DENEGADO: Tu rol de Agente solo permite uso de Bot de WhatsApp. Contacta al administrador.", "SEGURIDAD SECORVI");
+                }
             }
             else
             {
-                MessageBox.Show($"ACCESO DENEGADO.\nVerifique sus credenciales.\nAgentes en DB: {DataService.Empleados.Count}", "SEGURIDAD SECORVI");
+                MostrarAviso("ACCESO DENEGADO: Credenciales incorrectas", "#F8D7DA", "#721C24");
             }
         }
 

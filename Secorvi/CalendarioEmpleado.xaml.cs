@@ -26,13 +26,18 @@ namespace Secorvi
         {
             InitializeComponent();
             _empleado = emp;
+
+            // Cultura MX para nombres de días y meses
             System.Threading.Thread.CurrentThread.CurrentCulture = new CultureInfo("es-MX");
+
+            // Cálculo del lunes de la semana actual
             _lunesActual = DateTime.Now.Date.AddDays(-(int)(DateTime.Now.Date.DayOfWeek == DayOfWeek.Sunday ? 6 : (int)DateTime.Now.Date.DayOfWeek - 1));
 
             CrearMenuContexto();
             this.Loaded += (s, e) => {
                 if (dpSaltoFecha != null) dpSaltoFecha.SelectedDate = _lunesActual;
-                if (lblNombreEmpleado != null) lblNombreEmpleado.Text = $"{_empleado?.Nombre} {_empleado?.Apellido}".ToUpper();
+                // Sincronizado con nombre_completo (minúsculas)
+                if (lblNombreEmpleado != null) lblNombreEmpleado.Text = _empleado?.nombre_completo?.ToUpper();
                 IniciarReloj();
                 DibujarGrid();
                 ActualizarVista();
@@ -54,8 +59,10 @@ namespace Secorvi
             GridCalendario.RowDefinitions.Clear();
             GridCalendario.ColumnDefinitions.Clear();
             GridCalendario.Children.Clear();
+
             GridCalendario.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
             for (int i = 0; i < 7; i++) GridCalendario.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
             GridCalendario.RowDefinitions.Add(new RowDefinition { Height = new GridLength(FILA_ALTURA) });
 
             for (int d = 1; d <= 7; d++)
@@ -86,46 +93,40 @@ namespace Secorvi
         {
             if (GridCalendario == null) return;
 
-            // 1. Limpieza visual de bloques anteriores
-            var paraEliminar = GridCalendario.Children.OfType<Border>()
-                .Where(b => b.Tag?.ToString() == "VISUAL_ASIG").ToList();
+            // 1. Limpiar visuales
+            var paraEliminar = GridCalendario.Children.OfType<Border>().Where(b => b.Tag?.ToString() == "VISUAL_ASIG").ToList();
             foreach (var b in paraEliminar) GridCalendario.Children.Remove(b);
 
-            // 2. Sincronizar con la Base de Datos
-            DataService.CargarAsignaciones();
+            // 2. Cargar desde DB
+            DataService.ActualizarTodo();
 
-            // 3. Filtrar asignaciones de la semana para este empleado
+            // 3. Filtrar (Sincronizado con minúsculas: id_empleado, fecha)
             var asignaciones = DataService.Asignaciones.Where(a =>
-                a.IdEmpleado == _empleado.Id &&
-                a.Fecha.Date >= _lunesActual.Date &&
-                a.Fecha.Date <= _lunesActual.AddDays(6).Date).ToList();
+                a.id_empleado == _empleado.id_empleado &&
+                a.fecha.Date >= _lunesActual.Date &&
+                a.fecha.Date <= _lunesActual.AddDays(6).Date).ToList();
 
-            // --- TRES CONTADORES INDEPENDIENTES ---
-            int serviciosContador = 0;
-            int descansosContador = 0;
-            int vacacionesContador = 0;
+            int servicios = 0; int descansos = 0; int vacaciones = 0;
 
-            if (lblRangoSemana != null)
-                lblRangoSemana.Text = $"{_lunesActual:dd MMM} - {_lunesActual.AddDays(6):dd MMM}".ToUpper();
+            if (lblRangoSemana != null) lblRangoSemana.Text = $"{_lunesActual:dd MMM} - {_lunesActual.AddDays(6):dd MMM}".ToUpper();
 
             foreach (var asig in asignaciones)
             {
-                var turno = DataService.Turnos.FirstOrDefault(t => t.Id == asig.IdTurno);
-                var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.Id == asig.IdUbicacion);
+                // Sincronizado con: id_turno (minúscula), id_lugar (minúscula), estatus (minúscula)
+                var turno = DataService.Turnos.FirstOrDefault(t => t.id_turno == asig.id_turno);
+                var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_lugar == asig.id_ubicacion);
 
                 if (turno == null) continue;
 
-                // --- LÓGICA DE CONTEO ---
-                if (asig.Estatus == "VACACIONES") vacacionesContador++;
-                else if (asig.Estatus == "DÍA LIBRE") descansosContador++;
-                else serviciosContador++;
+                if (asig.estatus == "VACACIONES") vacaciones++;
+                else if (asig.estatus == "DÍA LIBRE") descansos++;
+                else servicios++;
 
-                // --- COLORES CORREGIDOS SEGÚN TU GUÍA ---
-                Color colorBase = asig.Estatus switch
+                Color colorBase = asig.estatus switch
                 {
-                    "VACACIONES" => Color.FromRgb(52, 152, 219), // AZUL (Vacaciones)
-                    "DÍA LIBRE" => Color.FromRgb(55, 65, 81),    // GRIS (Descanso)
-                    _ => Color.FromRgb(192, 57, 43)              // ROJO (Servicio)
+                    "VACACIONES" => Color.FromRgb(52, 152, 219),
+                    "DÍA LIBRE" => Color.FromRgb(55, 65, 81),
+                    _ => Color.FromRgb(192, 57, 43)
                 };
 
                 Border bloque = new Border
@@ -141,47 +142,36 @@ namespace Secorvi
 
                 bloque.MouseLeftButtonDown += (s, ev) => {
                     ev.Handled = true;
-                    _fechasSeleccionadas = new List<DateTime> { asig.Fecha };
-                    _menuContexto.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+                    _fechasSeleccionadas = new List<DateTime> { asig.fecha };
+                    _menuContexto.Placement = PlacementMode.MousePoint;
                     _menuContexto.IsOpen = true;
                 };
 
-                string texto = asig.Estatus switch
+                string texto = asig.estatus switch
                 {
                     "VACACIONES" => "VACACIONES",
                     "DÍA LIBRE" => "DESCANSO",
-                    _ => $"{ubi?.Nombre ?? "PUNTO"}\n{DateTime.Today.Add(turno.HoraInicio):hh:mm tt} - {DateTime.Today.Add(turno.HoraFin):hh:mm tt}".ToUpper()
+                    _ => $"{ubi?.nombre_lugar ?? "PUNTO"}\n{DateTime.Today.Add(turno.hora_inicio):hh:mm tt} - {DateTime.Today.Add(turno.hora_fin):hh:mm tt}".ToUpper()
                 };
 
-                bloque.Child = new TextBlock
-                {
-                    Text = texto,
-                    Foreground = Brushes.White,
-                    FontSize = 7.5,
-                    FontWeight = FontWeights.Bold,
-                    TextAlignment = TextAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    TextWrapping = TextWrapping.Wrap
-                };
+                bloque.Child = new TextBlock { Text = texto, Foreground = Brushes.White, FontSize = 7.5, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
 
-                // Posicionamiento
-                int col = (int)asig.Fecha.DayOfWeek;
+                int col = (int)asig.fecha.DayOfWeek;
                 col = (col == 0) ? 7 : col;
-                int row = turno.HoraInicio.Hours + 1;
-                int span = (int)(turno.HoraFin - turno.HoraInicio).TotalHours;
-                if (span <= 0) span = 24;
+                int row = turno.hora_inicio.Hours + 1;
+                int span = (int)(turno.hora_fin - turno.hora_inicio).TotalHours;
+                if (span <= 0) span = 1;
 
-                Grid.SetColumn(bloque, col);
-                Grid.SetRow(bloque, row);
-                Grid.SetRowSpan(bloque, span);
+                Grid.SetColumn(bloque, col); Grid.SetRow(bloque, row); Grid.SetRowSpan(bloque, span);
                 GridCalendario.Children.Add(bloque);
             }
 
-            // --- ACTUALIZACIÓN DE ETIQUETAS ---
-            if (lblTotalServicios != null) lblTotalServicios.Text = serviciosContador.ToString();
-            if (lblTotalDescansos != null) lblTotalDescansos.Text = descansosContador.ToString();
-            if (lblTotalVacaciones != null) lblTotalVacaciones.Text = vacacionesContador.ToString();
+            // Actualizar etiquetas de contadores
+            if (lblTotalServicios != null) lblTotalServicios.Text = servicios.ToString();
+            if (lblTotalDescansos != null) lblTotalDescansos.Text = descansos.ToString();
+            if (lblTotalVacaciones != null) lblTotalVacaciones.Text = vacaciones.ToString();
         }
+
         private void CrearMenuContexto()
         {
             _menuContexto = new ContextMenu();
@@ -191,55 +181,31 @@ namespace Secorvi
             _menuContexto.Items.Add(itemEli); _menuContexto.Items.Add(itemLibre); _menuContexto.Items.Add(itemVac);
         }
 
-        private void EjecutarEliminacionSilenciosa() { foreach (var f in _fechasSeleccionadas.Select(x => x.Date).Distinct()) DataService.EliminarAsignacionPorFecha(_empleado.Id, f); ActualizarVista(); }
+        private void EjecutarEliminacionSilenciosa()
+        {
+            foreach (var f in _fechasSeleccionadas.Select(x => x.Date).Distinct())
+                DataService.EliminarAsignacionPorFecha(_empleado.id_empleado, f);
+            ActualizarVista();
+        }
+
         private void AsignarEstadoEspecial(string t)
         {
             foreach (var f in _fechasSeleccionadas.Select(x => x.Date).Distinct())
             {
-                DataService.EliminarAsignacionPorFecha(_empleado.Id, f);
-                var tE = DataService.Turnos.FirstOrDefault(x => x.Nombre == t);
-                if (tE != null) DataService.CrearAsignacion(new Asignacion { IdEmpleado = _empleado.Id, IdUbicacion = 0, IdTurno = tE.Id, Fecha = f, Estatus = t });
+                DataService.EliminarAsignacionPorFecha(_empleado.id_empleado, f);
+                // Sincronizado con: nombre (minúscula) e id_turno (minúscula)
+                var tE = DataService.Turnos.FirstOrDefault(x => x.nombre == t);
+                if (tE != null)
+                    DataService.CrearAsignacion(new Asignacion { id_empleado = _empleado.id_empleado, id_ubicacion = 0, id_turno = tE.id_turno, fecha = f, estatus = t });
             }
             ActualizarVista();
         }
 
-        private void MenuItem_LimpiarDia_Click(object sender, RoutedEventArgs e)
-        {
-            EjecutarEliminacionSilenciosa();
-        }
-
-        private void MenuItem_CopiarDia_Click(object sender, RoutedEventArgs e)
-        {
-            if (_fechasSeleccionadas.Count > 0)
-            {
-                DateTime fechaOrigen = _fechasSeleccionadas.First().Date;
-                DateTime fechaDestino = fechaOrigen.AddDays(1);
-                var asigOriginal = DataService.Asignaciones.FirstOrDefault(a =>
-                    a.IdEmpleado == _empleado.Id && a.Fecha.Date == fechaOrigen);
-
-                if (asigOriginal != null)
-                {
-
-                    DataService.EliminarAsignacionPorFecha(_empleado.Id, fechaDestino);
-
-                    var copia = new Asignacion
-                    {
-                        IdEmpleado = asigOriginal.IdEmpleado,
-                        IdUbicacion = asigOriginal.IdUbicacion,
-                        IdTurno = asigOriginal.IdTurno,
-                        Fecha = fechaDestino,
-                        Estatus = asigOriginal.Estatus
-                    };
-                    DataService.CrearAsignacion(copia);
-                    ActualizarVista();
-                    MessageBox.Show("Turno copiado al día siguiente.");
-                }
-            }
-        }
-
+        // Lógica de Selección por Arrastre (Dragging)
         private void Celda_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) { _dragging = true; _startCell = sender as Border; Mouse.Capture(GridCalendario, CaptureMode.SubTree); LimpiarSeleccionVisual(); }
         private void Celda_PreviewMouseMove(object sender, MouseEventArgs e) { if (_dragging && _startCell != null && sender is Border c) SeleccionarRango((DateTime)_startCell.Tag, (DateTime)c.Tag); }
         private void Celda_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e) { _dragging = false; Mouse.Capture(null); if (_fechasSeleccionadas.Count > 0) { _menuContexto.Placement = PlacementMode.MousePoint; _menuContexto.IsOpen = true; } }
+
         private void SeleccionarRango(DateTime inicio, DateTime fin)
         {
             LimpiarSeleccionVisual();
@@ -249,12 +215,39 @@ namespace Secorvi
                 if (dt >= (inicio < fin ? inicio : fin) && dt <= (inicio < fin ? fin : inicio)) { b.Background = new SolidColorBrush(Color.FromArgb(100, 255, 179, 0)); _fechasSeleccionadas.Add(dt); }
             }
         }
+
         private void LimpiarSeleccionVisual() { foreach (Border b in GridCalendario.Children.OfType<Border>().Where(x => x.Tag is DateTime)) b.Background = Brushes.Transparent; _fechasSeleccionadas.Clear(); }
         private void ActualizarVista() { CargarAsignaciones(); }
+
         private void DpSaltoFecha_SelectedDateChanged(object sender, SelectionChangedEventArgs e) { if (dpSaltoFecha?.SelectedDate != null) { DateTime f = dpSaltoFecha.SelectedDate.Value; _lunesActual = f.AddDays(-(int)(f.DayOfWeek == DayOfWeek.Sunday ? 6 : (int)f.DayOfWeek - 1)); DibujarGrid(); ActualizarVista(); } }
-        private void BtnAsignarHorario_Click(object sender, RoutedEventArgs e) { Mapa win = new Mapa(_empleado.Id, _lunesActual); win.Owner = Window.GetWindow(this); if (win.ShowDialog() == true) ActualizarVista(); }
+
+        // Sincronizado con: id_empleado (minúscula)
+        private void BtnAsignarHorario_Click(object sender, RoutedEventArgs e) { Mapa win = new Mapa(_empleado.id_empleado, _lunesActual); win.Owner = Window.GetWindow(this); if (win.ShowDialog() == true) ActualizarVista(); }
+
         private void BtnVolver_Click(object sender, RoutedEventArgs e) => NavigationService?.GoBack();
         private void BtnSemanaAtras_Click(object sender, RoutedEventArgs e) { _lunesActual = _lunesActual.AddDays(-7); DibujarGrid(); ActualizarVista(); }
         private void BtnSemanaAdelante_Click(object sender, RoutedEventArgs e) { _lunesActual = _lunesActual.AddDays(7); DibujarGrid(); ActualizarVista(); }
+
+        // MÉTODOS DE MENÚ CONTEXTO (Copiar y Limpiar)
+        private void MenuItem_CopiarDia_Click(object sender, RoutedEventArgs e)
+        {
+            if (_fechasSeleccionadas.Count > 0)
+            {
+                DateTime fechaOrigen = _fechasSeleccionadas.First().Date;
+                DateTime fechaDestino = fechaOrigen.AddDays(1);
+                var asigOriginal = DataService.Asignaciones.FirstOrDefault(a => a.id_empleado == _empleado.id_empleado && a.fecha.Date == fechaOrigen);
+
+                if (asigOriginal != null)
+                {
+                    DataService.EliminarAsignacionPorFecha(_empleado.id_empleado, fechaDestino);
+                    var copia = new Asignacion { id_empleado = asigOriginal.id_empleado, id_ubicacion = asigOriginal.id_ubicacion, id_turno = asigOriginal.id_turno, fecha = fechaDestino, estatus = asigOriginal.estatus };
+                    DataService.CrearAsignacion(copia);
+                    ActualizarVista();
+                    MessageBox.Show("Turno copiado al día siguiente.");
+                }
+            }
+        }
+
+        private void MenuItem_LimpiarDia_Click(object sender, RoutedEventArgs e) { EjecutarEliminacionSilenciosa(); }
     }
 }

@@ -5,6 +5,38 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen">
 
+    <Window.Resources>
+        <Style x:Key="TerminalInputStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="#1F2937"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#374151"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CaretBrush" Value="#FFB300"/>
+        </Style>
+
+        <Style x:Key="GoldButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#FFB300"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontWeight" Value="Black"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E6A100"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
     <Border Background="#111827" CornerRadius="15" BorderBrush="#374151" BorderThickness="1.5">
         <Grid>
             <Grid.RowDefinitions>
@@ -25,29 +57,24 @@
                 <StackPanel Margin="30,20">
 
                     <TextBlock Text="MATRÍCULA (SISTEMA)" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
-                    <TextBox x:Name="txtMatricula" IsReadOnly="True" Background="#0F172A" Foreground="#FFB300" 
-                             BorderBrush="#374151" Padding="10" Margin="0,0,0,15" BorderThickness="1"/>
+                    <TextBox x:Name="txtMatricula" IsReadOnly="True" Style="{StaticResource TerminalInputStyle}" 
+                             Foreground="#FFB300" Background="#0F172A" Margin="0,0,0,15"/>
 
                     <TextBlock Text="NOMBRE(S)" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
-                    <TextBox x:Name="txtNombre" Background="#1F2937" Foreground="White" BorderBrush="#374151" Padding="10" Margin="0,0,0,15"/>
+                    <TextBox x:Name="txtNombre" Style="{StaticResource TerminalInputStyle}" Margin="0,0,0,15"/>
 
                     <TextBlock Text="APELLIDOS" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
-                    <TextBox x:Name="txtApellido" Background="#1F2937" Foreground="White" BorderBrush="#374151" Padding="10" Margin="0,0,0,15"/>
+                    <TextBox x:Name="txtApellido" Style="{StaticResource TerminalInputStyle}" Margin="0,0,0,15"/>
 
                     <TextBlock Text="WHATSAPP" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
-                    <TextBox x:Name="txtTelefono" Background="#1F2937" Foreground="White" BorderBrush="#374151" Padding="10" Margin="0,0,0,15" MaxLength="10"/>
+                    <TextBox x:Name="txtTelefono" Style="{StaticResource TerminalInputStyle}" Margin="0,0,0,15" MaxLength="10"/>
 
                     <TextBlock Text="CONTRASEÑA" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
-                    <PasswordBox x:Name="txtPass" Background="#1F2937" Foreground="White" BorderBrush="#374151" Padding="10" Margin="0,0,0,25"/>
+                    <PasswordBox x:Name="txtPass" Background="#1F2937" Foreground="White" BorderBrush="#374151" 
+                                 Padding="10" Margin="0,0,0,25"/>
 
-                    <Button Content="REGISTRAR EN BASE DE DATOS" Click="BtnGuardar_Click" Height="45" 
-                            Background="#FFB300" Foreground="Black" FontWeight="Bold" Cursor="Hand">
-                        <Button.Resources>
-                            <Style TargetType="Border">
-                                <Setter Property="CornerRadius" Value="8"/>
-                            </Style>
-                        </Button.Resources>
-                    </Button>
+                    <Button Content="REGISTRAR EN BASE DE DATOS" Click="BtnGuardar_Click" 
+                            Height="45" Style="{StaticResource GoldButtonStyle}"/>
 
                     <Button Content="CANCELAR OPERACIÓN" Click="BtnCancelar_Click" Margin="0,15,0,0" 
                             Background="Transparent" Foreground="#6B7280" BorderThickness="0" Cursor="Hand" FontSize="10"/>
