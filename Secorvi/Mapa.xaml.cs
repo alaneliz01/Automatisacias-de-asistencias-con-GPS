@@ -26,7 +26,6 @@ namespace Secorvi
 
             if (dpFecha != null) dpFecha.SelectedDate = _fechaAsignacion;
 
-            // SINCRONIZADO: id_empleado y nombre_completo
             var emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == _idEmpleadoPreseleccionado);
             if (lblEmpleadoActivo != null)
                 lblEmpleadoActivo.Text = $"AGENTE: {(emp?.nombre_completo ?? "---").ToUpper()}";
@@ -43,7 +42,6 @@ namespace Secorvi
             {
                 await mapaWebView.EnsureCoreWebView2Async();
 
-                // Lógica de Leaflet intacta como pediste
                 string html = @"
 <!DOCTYPE html>
 <html>
@@ -88,7 +86,7 @@ namespace Secorvi
             if (query.length < 3) { list.style.display = 'none'; return; }
             debounceTimer = setTimeout(async () => {
                 try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&countrycodes=mx`);
+                    const response = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&limit=6&countrycodes=mx');
                     const data = await response.json();
                     renderSuggestions(data, query);
                 } catch (err) { console.error(err); }
@@ -103,8 +101,8 @@ namespace Secorvi
                 data.forEach((item, index) => {
                     const div = document.createElement('div');
                     div.className = 'suggestion-item';
-                    const regex = new RegExp(`(${query})`, 'gi');
-                    div.innerHTML = item.display_name.replace(regex, ""<span class='highlight'>$1</span>"");
+                    const regex = new RegExp('(' + query + ')', 'gi');
+                    div.innerHTML = item.display_name.replace(regex, '<span class=""highlight"">$1</span>');
                     div.onclick = () => selectItem(item);
                     list.appendChild(div);
                 });
@@ -157,7 +155,7 @@ namespace Secorvi
                         {
                             _selectedLat = doc.RootElement.GetProperty("lat").GetDouble();
                             _selectedLng = doc.RootElement.GetProperty("lng").GetDouble();
-                            txtCoords.Text = $"{_selectedLat:F6}, {_selectedLng:F6}";
+                            txtCoords.Text = string.Format("{0:F6}, {1:F6}", _selectedLat, _selectedLng);
                         }
                     }
                     catch { }
@@ -169,7 +167,6 @@ namespace Secorvi
         private void RefrescarListaUbicaciones()
         {
             lstUbicaciones.ItemsSource = null;
-            // SINCRONIZADO: nombre_lugar
             lstUbicaciones.ItemsSource = DataService.Ubicaciones.OrderBy(u => u.nombre_lugar).ToList();
         }
 
@@ -178,10 +175,12 @@ namespace Secorvi
             if (lstUbicaciones.SelectedItem is Ubicacion u)
             {
                 txtNombrePunto.Text = u.nombre_lugar;
-                _selectedLat = (double)u.latitud; // Casteo a double para compatibilidad con Leaflet
+                _selectedLat = (double)u.latitud;
                 _selectedLng = (double)u.longitud;
-                txtCoords.Text = $"{_selectedLat:F6}, {_selectedLng:F6}";
-                mapaWebView.ExecuteScriptAsync($"window.updatePos({_selectedLat.ToString(CultureInfo.InvariantCulture)}, {_selectedLng.ToString(CultureInfo.InvariantCulture)})");
+                txtCoords.Text = string.Format("{0:F6}, {1:F6}", _selectedLat, _selectedLng);
+                mapaWebView.ExecuteScriptAsync(string.Format("window.updatePos({0}, {1})",
+                    _selectedLat.ToString(CultureInfo.InvariantCulture),
+                    _selectedLng.ToString(CultureInfo.InvariantCulture)));
             }
         }
 
@@ -189,27 +188,76 @@ namespace Secorvi
         {
             if (_selectedLat == 0 || string.IsNullOrWhiteSpace(txtHoraInicio.Text))
             {
-                MessageBox.Show("Seleccione un punto."); return;
+                MessageBox.Show("Seleccione un punto en el mapa."); return;
             }
+
             try
             {
-                DateTime dtI = DateTime.ParseExact(txtHoraInicio.Text.Trim(), "hh:mm tt", CultureInfo.InvariantCulture);
-                DateTime dtF = DateTime.ParseExact(txtHoraFin.Text.Trim(), "hh:mm tt", CultureInfo.InvariantCulture);
+                string inicioRaw = txtHoraInicio.Text.Trim().ToUpper();
+                string finRaw = txtHoraFin.Text.Trim().ToUpper();
 
-                // SINCRONIZADO: id_lugar, nombre_lugar, latitud, longitud
-                Ubicacion ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == txtNombrePunto.Text.ToUpper()) ??
-                               new Ubicacion { nombre_lugar = txtNombrePunto.Text.ToUpper(), latitud = (decimal)_selectedLat, longitud = (decimal)_selectedLng, radio_permitido = 200 };
+                if (inicioRaw.EndsWith("AM") && !inicioRaw.Contains(" ")) inicioRaw = inicioRaw.Replace("AM", " AM");
+                if (inicioRaw.EndsWith("PM") && !inicioRaw.Contains(" ")) inicioRaw = inicioRaw.Replace("PM", " PM");
+                if (finRaw.EndsWith("AM") && !finRaw.Contains(" ")) finRaw = finRaw.Replace("AM", " AM");
+                if (finRaw.EndsWith("PM") && !finRaw.Contains(" ")) finRaw = finRaw.Replace("PM", " PM");
 
-                if (ubi.id_lugar == 0)
+                DateTime dtI = DateTime.ParseExact(inicioRaw, "hh:mm tt", CultureInfo.InvariantCulture);
+                DateTime dtF = DateTime.ParseExact(finRaw, "hh:mm tt", CultureInfo.InvariantCulture);
+                string nombrePunto = txtNombrePunto.Text.Trim().ToUpper();
+                Ubicacion ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == nombrePunto);
+
+                if (ubi == null)
                 {
+                    // Si el lugar no existe, lo creamos con las coordenadas actuales
+                    ubi = new Ubicacion
+                    {
+                        nombre_lugar = nombrePunto,
+                        latitud = (decimal)_selectedLat,  
+                        longitud = (decimal)_selectedLng,
+                        radio_permitido = 200
+                    };
                     DataService.AgregarUbicacion(ubi);
-                    DataService.CargarUbicaciones();
-                    ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == txtNombrePunto.Text.ToUpper());
+                }
+                else
+                {
+             
+                    ubi.latitud = (decimal)_selectedLat;   
+                    ubi.longitud = (decimal)_selectedLng;
+                    DataService.ActualizarUbicacion(ubi);
                 }
 
-                // SINCRONIZADO: hora_inicio, hora_fin, id_turno, nombre
+                if (ubi == null)
+                {
+                    // Si el lugar no existe, lo creamos
+                    ubi = new Ubicacion
+                    {
+                        nombre_lugar = nombrePunto,
+                        latitud = (decimal)_selectedLat,
+                        longitud = (decimal)_selectedLng,
+                        radio_permitido = 200
+                    };
+                    DataService.AgregarUbicacion(ubi);
+                }
+                else
+                {
+                    // Si ya existe, actualizamos sus coordenadas por si se movió el pin
+                    ubi.latitud = (decimal)_selectedLat;
+                    ubi.longitud = (decimal)_selectedLng;
+                    DataService.ActualizarUbicacion(ubi);
+                }
+
+                // Sincronizar ID
+                DataService.CargarUbicaciones();
+                ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == nombrePunto);
+
+                // --- GESTIÓN DE TURNO ---
                 var t = DataService.Turnos.FirstOrDefault(x => x.hora_inicio == dtI.TimeOfDay && x.hora_fin == dtF.TimeOfDay) ??
-                        new Turno { nombre = "PERSONALIZADO", hora_inicio = dtI.TimeOfDay, hora_fin = dtF.TimeOfDay };
+                        new Turno
+                        {
+                            nombre = "TURNO " + dtI.ToString("hh:mm tt"),
+                            hora_inicio = dtI.TimeOfDay,
+                            hora_fin = dtF.TimeOfDay
+                        };
 
                 if (t.id_turno == 0)
                 {
@@ -218,20 +266,25 @@ namespace Secorvi
                     t = DataService.Turnos.Last();
                 }
 
-                // SINCRONIZADO: id_empleado, fecha (columna SQL), id_ubicacion, id_turno
-                DataService.EliminarAsignacionPorFecha(_idEmpleadoPreseleccionado, dpFecha.SelectedDate ?? DateTime.Today);
+                DateTime fechaDestino = dpFecha.SelectedDate ?? DateTime.Today;
+                DataService.EliminarAsignacionPorFecha(_idEmpleadoPreseleccionado, fechaDestino);
+
                 DataService.CrearAsignacion(new Asignacion
                 {
                     id_empleado = _idEmpleadoPreseleccionado,
                     id_ubicacion = ubi.id_lugar,
                     id_turno = t.id_turno,
-                    fecha = dpFecha.SelectedDate ?? DateTime.Today,
+                    fecha = fechaDestino,
                     estatus = "PROGRAMADO"
                 });
 
-                this.DialogResult = true; this.Close();
+                this.DialogResult = true;
+                this.Close();
             }
-            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("ERROR DE FORMATO: Use '07:00 AM'.\nDetalle: " + ex.Message);
+            }
         }
 
         private void BtnEliminarVarios_Click(object sender, RoutedEventArgs e)
@@ -239,7 +292,7 @@ namespace Secorvi
             var items = lstUbicaciones.SelectedItems.Cast<Ubicacion>().ToList();
             if (items.Count == 0) return;
 
-            var confirm = MessageBox.Show($"¿Desea eliminar {items.Count} ubicaciones?", "CONFIRMAR", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            var confirm = MessageBox.Show(string.Format("¿Desea eliminar {0} ubicaciones?", items.Count), "CONFIRMAR", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (confirm == MessageBoxResult.Yes)
             {
                 try
@@ -250,6 +303,7 @@ namespace Secorvi
                 catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
             }
         }
+
         private void BtnCancelarSeleccion_Click(object sender, RoutedEventArgs e) => lstUbicaciones.UnselectAll();
         private void BtnCancelar_Click(object sender, RoutedEventArgs e) => this.Close();
     }

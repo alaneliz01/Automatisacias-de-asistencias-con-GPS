@@ -35,7 +35,7 @@ namespace Secorvi
             if (_autoRefreshTimer == null)
             {
                 _autoRefreshTimer = new DispatcherTimer();
-                _autoRefreshTimer.Interval = TimeSpan.FromSeconds(30);
+                _autoRefreshTimer.Interval = TimeSpan.FromSeconds(30); // Refresco cada 30 seg
                 _autoRefreshTimer.Tick += (s, ev) => CargarDatosDesdeDB();
             }
 
@@ -47,44 +47,39 @@ namespace Secorvi
         {
             try
             {
-                // Refresco masivo de datos desde MySQL
+                // 1. Sincroniza con MySQL (Solo trae los 'Activos' según tu DataService)
                 DataService.ActualizarTodo();
 
-                // Enlazamos al DataGrid (dgEmpleados)
-                dgEmpleados.ItemsSource = null;
-                dgEmpleados.ItemsSource = DataService.Empleados;
-
-                // Actualizamos el contador de registros del diseño
-                if (lblTotal != null)
-                {
-                    lblTotal.Text = $"Registros: {DataService.Empleados.Count}";
-                }
+                // 2. Aplicamos el filtro actual para no perder lo que el usuario está escribiendo
+                FiltrarYMostrar();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("OCC_LOG: Error en refresco automático: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("SECORVI_LOG: Error en refresco: " + ex.Message);
             }
         }
 
-        private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
+        private void FiltrarYMostrar()
         {
             string filtro = txtBusqueda.Text?.Trim().ToLower() ?? "";
 
-            if (string.IsNullOrEmpty(filtro))
-            {
-                dgEmpleados.ItemsSource = DataService.Empleados;
-                return;
-            }
-
-            // Búsqueda en los campos del modelo en minúsculas
+            // BÚSQUEDA INTELIGENTE: Por ID, Nombre, Matrícula o Teléfono
             var filtrados = DataService.Empleados.Where(x =>
+                x.id_empleado.ToString().Contains(filtro) ||
                 (x.nombre_completo?.ToLower().Contains(filtro) ?? false) ||
                 (x.matricula?.ToLower().Contains(filtro) ?? false) ||
                 (x.telefono?.Contains(filtro) ?? false)
             ).ToList();
 
+            dgEmpleados.ItemsSource = null;
             dgEmpleados.ItemsSource = filtrados;
+
+            // Actualizamos el contador visual
+            if (lblTotal != null)
+                lblTotal.Text = $"Agentes Activos: {filtrados.Count}";
         }
+
+        private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e) => FiltrarYMostrar();
 
         private void BtnNuevo_Click(object sender, RoutedEventArgs e)
         {
@@ -98,14 +93,15 @@ namespace Secorvi
         {
             if (dgEmpleados.SelectedItem is Empleado emp)
             {
-                // Seguridad: No permitir que el admin activo se borre a sí mismo
+                // Seguridad: No borrar al administrador actual
                 if (SesionActual.Usuario?.id_empleado == emp.id_empleado)
                 {
-                    MessageBox.Show("ACCESO DENEGADO: No puede dar de baja su propio acceso administrativo.", "SEGURIDAD SECORVI");
+                    MessageBox.Show("ACCESO DENEGADO: No puede dar de baja su propio acceso.", "SEGURIDAD");
                     return;
                 }
 
-                var res = MessageBox.Show($"¿CONFIRMAR BAJA DEFINITIVA DEL AGENTE {emp.nombre_completo}?",
+                var res = MessageBox.Show($"¿CONFIRMAR BAJA LÓGICA DEL AGENTE {emp.nombre_completo}?\n\n" +
+                    "Estatus cambiará a 'Inactivo' y no podrá usar el chatbot.",
                     "OPERACIÓN DE BAJA", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
                 if (res == MessageBoxResult.Yes)
@@ -120,32 +116,18 @@ namespace Secorvi
         {
             if (dgEmpleados.SelectedItem is Empleado emp)
             {
-                bool esAdminActual = (emp.id_rol == 1);
-                string nuevoRol = esAdminActual ? "AGENTE" : "ADMINISTRADOR";
+                // Cambia entre Agente (3) y Admin Empleados (2)
+                int nuevoRol = (emp.id_rol == 3) ? 2 : 3;
+                string nombreRol = (nuevoRol == 2) ? "ADMINISTRADOR" : "AGENTE";
 
-                var res = MessageBox.Show($"¿CAMBIAR NIVEL DE ACCESO DE {emp.nombre_completo} A {nuevoRol}?",
+                var res = MessageBox.Show($"¿CAMBIAR ACCESO DE {emp.nombre_completo} A {nombreRol}?",
                     "GESTIÓN DE PERMISOS", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
                 if (res == MessageBoxResult.Yes)
                 {
-                    DataService.CambiarPermisos(emp.id_empleado, !esAdminActual);
+                    DataService.CambiarPermisos(emp.id_empleado, nuevoRol);
                     CargarDatosDesdeDB();
                 }
-            }
-        }
-
-        private void BtnMantenimiento_Click(object sender, RoutedEventArgs e)
-        {
-            if (!SesionActual.EsSuperAdmin) return;
-
-            var res = MessageBox.Show("¿EJECUTAR PURGA DE REGISTROS ANTIGUOS (6 MESES)?",
-                "MANTENIMIENTO DE SISTEMA", MessageBoxButton.YesNo, MessageBoxImage.Error);
-
-            if (res == MessageBoxResult.Yes)
-            {
-                int filas = DataService.PurgarRegistrosAntiguos(6);
-                MessageBox.Show($"OPTIMIZACIÓN FINALIZADA. {filas} REGISTROS ELIMINADOS.", "OCC_LOG");
-                CargarDatosDesdeDB();
             }
         }
 

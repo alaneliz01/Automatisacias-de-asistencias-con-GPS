@@ -11,8 +11,12 @@ namespace Secorvi
         public RegistroEmpleado()
         {
             InitializeComponent();
-            // Matrícula única: SEC-20260418...
+
+            // 1. Matrícula técnica: Se queda para no romper tus modelos de C#
             txtMatricula.Text = "SEC-" + DateTime.Now.ToString("yyyyMMddHHmmss");
+
+            // 2. ID Maestro: El que dictarás para el Chatbot de WhatsApp
+            lblIdGenerado.Text = DataService.ObtenerProximoIdEmpleado().ToString();
         }
 
         private void Border_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -22,13 +26,13 @@ namespace Secorvi
 
         private void BtnGuardar_Click(object sender, RoutedEventArgs e)
         {
-            // VALIDACIÓN DE CAMPOS
+            // Validación de campos requeridos por la lógica de negocio y la DB
             if (string.IsNullOrWhiteSpace(txtNombre.Text) ||
                 string.IsNullOrWhiteSpace(txtApellido.Text) ||
                 string.IsNullOrWhiteSpace(txtPass.Password) ||
                 string.IsNullOrWhiteSpace(txtTelefono.Text))
             {
-                MessageBox.Show("SISTEMA: Todos los campos son obligatorios.", "OCC LOG", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("SISTEMA: Todos los campos son obligatorios.", "SECORVI LOG", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -36,28 +40,42 @@ namespace Secorvi
             {
                 string nombre = txtNombre.Text.Trim();
                 string apellido = txtApellido.Text.Trim();
+                string tel = txtTelefono.Text.Trim();
 
-                // Generamos un usuario corto para n8n/Bot: ejemplo "alan4522"
-                string primerNombre = nombre.Contains(" ") ? nombre.Split(' ')[0] : nombre;
-                string usuarioSugerido = (primerNombre.ToLower() + DateTime.Now.ToString("ssmm"));
+                // 3. Generación de Usuario: Mantenemos 'Rommel style' para el login de escritorio
+                string usuarioAuto = (nombre.Split(' ')[0].ToLower() + DateTime.Now.ToString("ss"));
 
-                // ADAPTACIÓN: Propiedades en minúsculas para coincidir con la DB y borrar errores
+                DataService.ActualizarTodo();
+
+                // Validación de integridad para el número de teléfono
+                if (DataService.Empleados.Any(x => x.telefono == tel))
+                {
+                    MessageBox.Show("ERROR: El número de teléfono ya está registrado.", "DUPLICADO", MessageBoxButton.OK, MessageBoxImage.Stop);
+                    return;
+                }
+
+                // 4. Mapeo al Modelo: Llenamos todos los campos para evitar nulos en la DB
                 var nuevoEmpleado = new Empleado
                 {
                     nombre_completo = $"{nombre} {apellido}".ToUpper(),
+                    telefono = tel,
+                    usuario = usuarioAuto,
                     matricula = txtMatricula.Text,
-                    telefono = txtTelefono.Text.Trim(),
-                    usuario = usuarioSugerido,
                     contrasena = txtPass.Password,
-                    id_rol = 3, // Rango Agente
+                    id_rol = int.Parse(lblIdRol.Text), // Generalmente Rol 3 para Agentes
                     estatus = "Activo"
                 };
 
-                // PERSISTENCIA
+                // 5. Persistencia: DataService se encarga del INSERT
                 DataService.AgregarEmpleado(nuevoEmpleado);
 
-                MessageBox.Show($"OPERACIÓN EXITOSA\n\nUsuario: {usuarioSugerido}\nMatrícula: {nuevoEmpleado.matricula}",
-                                "OCC SYSTEM", MessageBoxButton.OK, MessageBoxImage.Information);
+                // Feedback visual con la información crítica para el Administrador
+                MessageBox.Show($"¡REGISTRO EXITOSO!\n\n" +
+                                $"DATOS PARA PANEL (C#):\n" +
+                                $"Usuario: {usuarioAuto}\n\n" +
+                                $"DATOS PARA BOT (WhatsApp):\n" +
+                                $"ID Único: {lblIdGenerado.Text}",
+                                "SECORVI SYSTEM", MessageBoxButton.OK, MessageBoxImage.Information);
 
                 this.DialogResult = true;
                 this.Close();

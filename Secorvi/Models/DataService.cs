@@ -61,7 +61,7 @@ namespace Secorvi
                 try
                 {
                     conn.Open();
-                    // Sincronizado con columna 'estatus' (ENUM)
+                    // Traemos todos para tener la lista completa en el Panel
                     var cmd = new MySqlCommand("SELECT * FROM empleados WHERE estatus = 'Activo'", conn);
                     using (var r = cmd.ExecuteReader())
                     {
@@ -70,18 +70,18 @@ namespace Secorvi
                             Empleados.Add(new Empleado
                             {
                                 id_empleado = Convert.ToInt32(r["id_empleado"]),
-                                nombre_completo = r["nombre_completo"]?.ToString() ?? "",
-                                matricula = r["matricula"]?.ToString() ?? "",
-                                telefono = r["telefono"]?.ToString() ?? "",
-                                usuario = r["usuario"]?.ToString() ?? "",
-                                contrasena = r["contrasena"]?.ToString() ?? "",
+                                nombre_completo = r["nombre_completo"].ToString(),
+                                telefono = r["telefono"].ToString(),
                                 id_rol = Convert.ToInt32(r["id_rol"]),
-                                estatus = r["estatus"]?.ToString() ?? "Activo"
+                                estatus = r["estatus"].ToString(),
+                                usuario = r["usuario"].ToString(),     // RE-VINCULADO
+                                contrasena = r["contrasena"].ToString(),
+                                matricula = r["matricula"].ToString()   // RE-VINCULADO
                             });
                         }
                     }
                 }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Error CargarEmpleados: " + ex.Message); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Error: " + ex.Message); }
             }
         }
 
@@ -89,7 +89,6 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                // Sincronizado con tabla empleados (id_rol, nombre_completo, estatus)
                 string query = "INSERT INTO empleados (nombre_completo, telefono, id_rol, estatus, usuario, contrasena, matricula) " +
                                "VALUES (@nom, @tel, @rol, 'Activo', @usu, @con, @mat)";
 
@@ -97,9 +96,9 @@ namespace Secorvi
                 cmd.Parameters.AddWithValue("@nom", emp.nombre_completo);
                 cmd.Parameters.AddWithValue("@tel", emp.telefono);
                 cmd.Parameters.AddWithValue("@rol", emp.id_rol);
-                cmd.Parameters.AddWithValue("@usu", emp.usuario);
+                cmd.Parameters.AddWithValue("@usu", emp.usuario);    // Enviamos el usuario generado
                 cmd.Parameters.AddWithValue("@con", emp.contrasena);
-                cmd.Parameters.AddWithValue("@mat", emp.matricula);
+                cmd.Parameters.AddWithValue("@mat", emp.matricula);  // Enviamos la matrícula generada
 
                 conn.Open();
                 cmd.ExecuteNonQuery();
@@ -296,16 +295,37 @@ namespace Secorvi
             }
             CargarAsignaciones();
         }
-        public static void CambiarPermisos(int idEmpleado, bool hacerAdmin)
-        {
-            int nuevoRol = hacerAdmin ? 1 : 3;
 
+        public static int ObtenerProximoIdEmpleado()
+        {
+            int proximoId = 1;
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                // Esta consulta le pregunta a MySQL cuál es el siguiente valor del auto_increment
+                string query = "SELECT AUTO_INCREMENT FROM information_schema.TABLES " +
+                               "WHERE TABLE_SCHEMA = 'secorvi_db' AND TABLE_NAME = 'empleados'";
+
+                MySqlCommand cmd = new MySqlCommand(query, conn);
+                try
+                {
+                    conn.Open();
+                    var result = cmd.ExecuteScalar();
+                    if (result != null && result != DBNull.Value)
+                        proximoId = Convert.ToInt32(result);
+                }
+                catch { /* Si falla, retornamos 1 por defecto */ }
+            }
+            return proximoId;
+        }
+
+        public static void CambiarPermisos(int idEmpleado, int nuevoRol)
+        {
             using (var conexion = new MySqlConnection(connectionString))
             {
                 try
                 {
                     conexion.Open();
-      
+                    // Actualizamos directamente con el número de rol que recibimos
                     string sql = "UPDATE empleados SET id_rol = @rol WHERE id_empleado = @id";
                     using (var cmd = new MySqlCommand(sql, conexion))
                     {
@@ -319,7 +339,34 @@ namespace Secorvi
                     System.Diagnostics.Debug.WriteLine("Error en CambiarPermisos: " + ex.Message);
                 }
             }
-            CargarEmpleados(); 
+            CargarEmpleados(); // Refrescamos la lista global
+        }
+        public static void ActualizarUbicacion(Ubicacion u)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                try
+                {
+                    // Actualizamos latitud y longitud basándonos en el id_lugar
+                    string query = "UPDATE ubicaciones SET latitud = @lat, longitud = @lng, radio_permitido = @rad " +
+                                   "WHERE id_lugar = @id";
+
+                    var cmd = new MySqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@lat", u.latitud);
+                    cmd.Parameters.AddWithValue("@lng", u.longitud);
+                    cmd.Parameters.AddWithValue("@rad", u.radio_permitido);
+                    cmd.Parameters.AddWithValue("@id", u.id_lugar);
+
+                    conn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Error al actualizar ubicación: " + ex.Message);
+                }
+            }
+            // Opcional: Recargar la lista local para que los cambios se reflejen en la UI
+            CargarUbicaciones();
         }
         public static int PurgarRegistrosAntiguos(int mesesAntiguedad)
         {

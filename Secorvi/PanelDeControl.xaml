@@ -6,13 +6,22 @@
       Background="#0B0D12" Language="es-MX">
 
     <Page.Resources>
+        <Style x:Key="TerminalInputStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="#161920"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#2D323E"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CaretBrush" Value="#FFB300"/>
+        </Style>
+
         <Style x:Key="IndustrialButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#161A21"/>
             <Setter Property="Foreground" Value="#E0E0E0"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="BorderBrush" Value="#2D323E"/>
             <Setter Property="Padding" Value="15,8"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -42,21 +51,9 @@
             <Setter Property="FontWeight" Value="Bold"/>
         </Style>
 
-        <Style TargetType="DataGridCell">
-            <Setter Property="Foreground" Value="#FFFFFF"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#2D323E"/>
-                    <Setter Property="Foreground" Value="#FFB300"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
         <Style TargetType="DataGridRow">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="#2D323E"/>
+            <Setter Property="BorderBrush" Value="#1A1F26"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
@@ -83,7 +80,7 @@
                     </StackPanel>
                     <Rectangle Width="1" Fill="#2D323E" Margin="25,5" Height="40"/>
                     <Button Content="+ REGISTRAR AGENTE" Click="BtnNuevo_Click" Style="{StaticResource IndustrialButtonStyle}" Background="#FFB300" Foreground="#0F111A" FontWeight="Black" Width="180" Height="40"/>
-                    <Button x:Name="btnRoles" Content="🛡️ PERMISOS" Click="BtnRoles_Click" Style="{StaticResource IndustrialButtonStyle}" Width="130" Height="40" Margin="10,0"/>
+                    <Button x:Name="btnRoles" Content="🛡️ PERMISOS" Click="BtnRoles_Click" Style="{StaticResource IndustrialButtonStyle}" Width="110" Height="40" Margin="10,0"/>
                 </StackPanel>
                 <Button Content="❌ DAR DE BAJA" Click="BtnEliminar_Click" DockPanel.Dock="Right" Style="{StaticResource IndustrialButtonStyle}" Background="#3D1B1E" Foreground="#FF5252" BorderBrush="#FF5252" Width="150" Height="40"/>
             </DockPanel>
@@ -96,9 +93,9 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="FILTRAR AGENTES:" Foreground="#6B7280" FontWeight="Bold" VerticalAlignment="Center" FontSize="10" Margin="0,0,15,0"/>
-                <TextBox x:Name="txtBusqueda" Grid.Column="1" Height="32" Background="#161920" Foreground="White" BorderBrush="#2D323E" BorderThickness="1" VerticalContentAlignment="Center" Padding="10,0" TextChanged="TxtBusqueda_TextChanged"/>
-                <TextBlock Grid.Column="2" Text="Registros: 0" x:Name="lblTotal" Foreground="#4B5563" VerticalAlignment="Center" Margin="15,0,0,0" FontSize="10"/>
+                <TextBlock Text="FILTRAR POR ID, NOMBRE O MATRÍCULA:" Foreground="#6B7280" FontWeight="Bold" VerticalAlignment="Center" FontSize="10" Margin="0,0,15,0"/>
+                <TextBox x:Name="txtBusqueda" Grid.Column="1" Height="32" Style="{StaticResource TerminalInputStyle}" TextChanged="TxtBusqueda_TextChanged"/>
+                <TextBlock Grid.Column="2" x:Name="lblTotal" Text="Agentes: 0" Foreground="#4B5563" VerticalAlignment="Center" Margin="15,0,0,0" FontSize="10"/>
             </Grid>
         </Border>
 
@@ -106,41 +103,50 @@
             <DataGrid x:Name="dgEmpleados" AutoGenerateColumns="False" CanUserAddRows="False" 
                       Background="Transparent" RowHeight="65" HeadersVisibility="Column" 
                       IsReadOnly="True" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#1A1F26"
-                      MouseDoubleClick="DgEmpleados_MouseDoubleClick" BorderThickness="0">
+                      BorderThickness="0" MouseDoubleClick="DgEmpleados_MouseDoubleClick">
                 <DataGrid.Columns>
 
-                    <DataGridTextColumn Header="MATRÍCULA" Binding="{Binding matricula}" Width="110">
+                    <DataGridTextColumn Header="ID BOT" Binding="{Binding id_empleado}" Width="80">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="Foreground" Value="#FFB300"/>
                                 <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="TextAlignment" Value="Center"/>
-                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="FontWeight" Value="Black"/>
+                                <Setter Property="FontSize" Value="14"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="MATRÍCULA" Binding="{Binding matricula}" Width="120">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#6B7280"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
                                 <Setter Property="FontFamily" Value="Consolas"/>
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
 
-                    <DataGridTextColumn Header="AGENTE" Binding="{Binding nombre_completo}" Width="200">
+                    <DataGridTextColumn Header="AGENTE" Binding="{Binding nombre_completo}" Width="250">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="VerticalAlignment" Value="Center"/>
                                 <Setter Property="FontWeight" Value="Bold"/>
-                                <Setter Property="Margin" Value="10,0"/>
-                                <Setter Property="Foreground" Value="#E0E0E0"/>
+                                <Setter Property="Foreground" Value="White"/>
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
 
-                    <DataGridTemplateColumn Header="ESTADO DE ASISTENCIA (WHATSAPP)" Width="*">
+                    <DataGridTemplateColumn Header="ESTADO N8N" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Border Background="#161920" CornerRadius="4" Padding="12,5" Margin="10,5" BorderThickness="1" BorderBrush="#2D323E">
                                     <DockPanel>
-                                        <Ellipse Width="8" Height="8" Fill="#2ECC71" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                        <Ellipse Width="8" Height="8" Fill="#2ECC71" DockPanel.Dock="Right" VerticalAlignment="Center"/>
                                         <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="CONEXIÓN ACTIVA" Foreground="#2ECC71" FontSize="11" FontWeight="Bold"/>
-                                            <TextBlock Text="Reporte sincronizado con n8n" Foreground="#6B7280" FontSize="10"/>
+                                            <TextBlock Text="BOT ACTIVO" Foreground="#2ECC71" FontSize="10" FontWeight="Bold"/>
+                                            <TextBlock Text="Sincronizado" Foreground="#4B5563" FontSize="9"/>
                                         </StackPanel>
                                     </DockPanel>
                                 </Border>
@@ -148,7 +154,7 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="ACCIONES" Width="140">
+                    <DataGridTemplateColumn Header="ACCIONES" Width="150">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Button Content="📅 CALENDARIO" Click="BtnCalendario_Click" Style="{StaticResource IndustrialButtonStyle}" 
@@ -163,27 +169,13 @@
 
         <Border Grid.Row="3" Background="#161920" CornerRadius="0,0,8,8" Padding="20,12" BorderBrush="#2D323E" BorderThickness="1,0,1,1">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="ESTADOS:" Foreground="#4B5563" FontSize="9" FontWeight="Black" Margin="0,0,15,0" VerticalAlignment="Center"/>
                     <Ellipse Width="8" Height="8" Fill="#2ECC71" Margin="0,0,5,0"/>
-                    <TextBlock Text="EN PUNTO" Foreground="#E0E0E0" FontSize="9" Margin="0,0,15,0" VerticalAlignment="Center"/>
-                    <Ellipse Width="8" Height="8" Fill="#E74C3C" Margin="0,0,5,0"/>
-                    <TextBlock Text="SIN REPORTE" Foreground="#E0E0E0" FontSize="9" Margin="0,0,15,0" VerticalAlignment="Center"/>
-                    <Rectangle Width="1" Fill="#2D323E" Margin="10,2" Height="15"/>
-                    <TextBlock Text="🖱️ DOBLE CLIC: Abrir Calendario" Foreground="#6B7280" FontSize="9" Margin="15,0,0,0" VerticalAlignment="Center"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="ENGINE:" Foreground="#4B5563" FontSize="9" FontWeight="Black" VerticalAlignment="Center"/>
-                    <TextBlock Text=" n8n ACTIVE" Foreground="#2ECC71" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                    <TextBlock Text="SISTEMA ONLINE" Foreground="#E0E0E0" FontSize="9" VerticalAlignment="Center"/>
                     <Rectangle Width="1" Fill="#2D323E" Margin="15,2" Height="15"/>
-                    <TextBlock Text="SECORVI v2.1" Foreground="#FFB300" FontSize="10" FontWeight="Black" VerticalAlignment="Center"/>
+                    <TextBlock Text="ENGINE: n8n ACTIVE | IDENTIFICADOR: ID_EMPLEADO" Foreground="#4B5563" FontSize="9" VerticalAlignment="Center"/>
                 </StackPanel>
+                <TextBlock HorizontalAlignment="Right" Text="SECORVI v2.5" Foreground="#FFB300" FontSize="10" FontWeight="Black" VerticalAlignment="Center"/>
             </Grid>
         </Border>
     </Grid>

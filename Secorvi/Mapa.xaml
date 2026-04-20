@@ -57,8 +57,6 @@
                             <ListBox.ContextMenu>
                                 <ContextMenu>
                                     <MenuItem Header="🗑️ ELIMINAR SELECCIÓN" Click="BtnEliminarVarios_Click"/>
-                                    <Separator/>
-                                    <MenuItem Header="❌ CANCELAR" Click="BtnCancelarSeleccion_Click"/>
                                 </ContextMenu>
                             </ListBox.ContextMenu>
                             <ListBox.ItemTemplate>
@@ -66,23 +64,23 @@
                                     <Border Background="#1A1F26" BorderBrush="#2D323E" BorderThickness="1" Padding="10" Margin="0,0,0,5" CornerRadius="2">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="📍" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Nombre}" Foreground="White" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding nombre_lugar}" Foreground="White" FontWeight="Bold"/>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem">
-                                    <Setter Property="Padding" Value="0"/>
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="BorderBrush" Value="#FFB300"/>
+                                        </Trigger>
+                                    </Style.Triggers>
                                 </Style>
                             </ListBox.ItemContainerStyle>
                         </ListBox>
-
-                        <Button x:Name="btnEliminarVarios" Content="🗑️ BORRAR SELECCIONADOS" 
-                                VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="5"
-                                Background="#CC0000" Foreground="White" FontSize="9" FontWeight="Bold"
-                                Padding="8,4" Click="BtnEliminarVarios_Click" Visibility="Collapsed"/>
                     </Grid>
 
                     <Border Grid.Row="3" Background="#11141B" BorderBrush="#2D323E" BorderThickness="1" Padding="12" Margin="0,0,0,15">
@@ -94,7 +92,7 @@
                                 </StackPanel>
                                 <StackPanel Margin="4,0,0,0">
                                     <TextBlock Text="HORA SALIDA" Foreground="#6B7280" FontSize="8" FontWeight="Bold"/>
-                                    <TextBox x:Name="txtHoraFin" Text="04:00 PM" Style="{StaticResource ModernInput}"/>
+                                    <TextBox x:Name="txtHoraFin" Text="02:00 PM" Style="{StaticResource ModernInput}"/>
                                 </StackPanel>
                             </UniformGrid>
                             <TextBlock Text="FECHA DE SERVICIO" Foreground="#6B7280" FontSize="8" FontWeight="Bold" Margin="0,0,0,2"/>
@@ -104,16 +102,6 @@
                             <Border Background="#0B0D12" Padding="5" BorderBrush="#2D323E" BorderThickness="1">
                                 <TextBlock x:Name="txtCoords" Text="PUNTO NO MARCADO" Foreground="#2ECC71" FontSize="9" HorizontalAlignment="Center" FontWeight="Bold"/>
                             </Border>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Grid.Row="4" Background="#0F111A" CornerRadius="4" Padding="10" Margin="0,0,0,10" BorderBrush="#2D323E" BorderThickness="1">
-                        <StackPanel>
-                            <TextBlock Text="GUÍA DE USO RÁPIDO:" Foreground="#FFB300" FontSize="9" FontWeight="Bold" Margin="0,0,0,5"/>
-                            <TextBlock Text="• CLICK EN MAPA: Define coordenadas." Foreground="#CCC" FontSize="8" Margin="0,0,0,2"/>
-                            <TextBlock Text="• CLICK DERECHO (LISTA): Elimina puntos." Foreground="#CCC" FontSize="8" Margin="0,0,0,2"/>
-                            <TextBlock Text="• CTRL + CLICK: Selecciona varios para borrar." Foreground="#CCC" FontSize="8" Margin="0,0,0,2"/>
-                            <TextBlock Text="• GUARDAR: Vincula punto y horario al agente." Foreground="#CCC" FontSize="8"/>
                         </StackPanel>
                     </Border>
 
