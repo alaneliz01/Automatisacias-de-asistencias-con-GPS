@@ -186,49 +186,32 @@ namespace Secorvi
 
         private void BtnGuardar_Click(object sender, RoutedEventArgs e)
         {
+            // Validación de seguridad
             if (_selectedLat == 0 || string.IsNullOrWhiteSpace(txtHoraInicio.Text))
             {
-                MessageBox.Show("Seleccione un punto en el mapa."); return;
+                MessageBox.Show("Seleccione un punto en el mapa.");
+                return;
             }
 
             try
             {
+                // --- 1. NORMALIZACIÓN DE HORAS (Tu lógica funcional) ---
                 string inicioRaw = txtHoraInicio.Text.Trim().ToUpper();
                 string finRaw = txtHoraFin.Text.Trim().ToUpper();
 
-                if (inicioRaw.EndsWith("AM") && !inicioRaw.Contains(" ")) inicioRaw = inicioRaw.Replace("AM", " AM");
-                if (inicioRaw.EndsWith("PM") && !inicioRaw.Contains(" ")) inicioRaw = inicioRaw.Replace("PM", " PM");
-                if (finRaw.EndsWith("AM") && !finRaw.Contains(" ")) finRaw = finRaw.Replace("AM", " AM");
-                if (finRaw.EndsWith("PM") && !finRaw.Contains(" ")) finRaw = finRaw.Replace("PM", " PM");
+                // Asegurar espacios para ParseExact
+                inicioRaw = System.Text.RegularExpressions.Regex.Replace(inicioRaw, @"(\d+)(AM|PM)", "$1 $2");
+                finRaw = System.Text.RegularExpressions.Regex.Replace(finRaw, @"(\d+)(AM|PM)", "$1 $2");
 
                 DateTime dtI = DateTime.ParseExact(inicioRaw, "hh:mm tt", CultureInfo.InvariantCulture);
                 DateTime dtF = DateTime.ParseExact(finRaw, "hh:mm tt", CultureInfo.InvariantCulture);
+
+                // --- 2. GESTIÓN DE UBICACIÓN (CORREGIDO: Sin duplicados) ---
                 string nombrePunto = txtNombrePunto.Text.Trim().ToUpper();
                 Ubicacion ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == nombrePunto);
 
                 if (ubi == null)
                 {
-                    // Si el lugar no existe, lo creamos con las coordenadas actuales
-                    ubi = new Ubicacion
-                    {
-                        nombre_lugar = nombrePunto,
-                        latitud = (decimal)_selectedLat,  
-                        longitud = (decimal)_selectedLng,
-                        radio_permitido = 200
-                    };
-                    DataService.AgregarUbicacion(ubi);
-                }
-                else
-                {
-             
-                    ubi.latitud = (decimal)_selectedLat;   
-                    ubi.longitud = (decimal)_selectedLng;
-                    DataService.ActualizarUbicacion(ubi);
-                }
-
-                if (ubi == null)
-                {
-                    // Si el lugar no existe, lo creamos
                     ubi = new Ubicacion
                     {
                         nombre_lugar = nombrePunto,
@@ -240,33 +223,36 @@ namespace Secorvi
                 }
                 else
                 {
-                    // Si ya existe, actualizamos sus coordenadas por si se movió el pin
                     ubi.latitud = (decimal)_selectedLat;
                     ubi.longitud = (decimal)_selectedLng;
                     DataService.ActualizarUbicacion(ubi);
                 }
 
-                // Sincronizar ID
+                // Sincronizar ID de base de datos
                 DataService.CargarUbicaciones();
                 ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == nombrePunto);
 
-                // --- GESTIÓN DE TURNO ---
-                var t = DataService.Turnos.FirstOrDefault(x => x.hora_inicio == dtI.TimeOfDay && x.hora_fin == dtF.TimeOfDay) ??
-                        new Turno
-                        {
-                            nombre = "TURNO " + dtI.ToString("hh:mm tt"),
-                            hora_inicio = dtI.TimeOfDay,
-                            hora_fin = dtF.TimeOfDay
-                        };
+                // --- 3. GESTIÓN DE TURNO ---
+                // Buscamos si ya existe el turno por horario
+                var t = DataService.Turnos.FirstOrDefault(x => x.hora_inicio == dtI.TimeOfDay && x.hora_fin == dtF.TimeOfDay);
 
-                if (t.id_turno == 0)
+                if (t == null)
                 {
+                    t = new Turno
+                    {
+                        nombre = nombrePunto.Contains("DESCANSO") ? "DESCANSO" : "TURNO " + dtI.ToString("hh:mm tt"),
+                        hora_inicio = dtI.TimeOfDay,
+                        hora_fin = dtF.TimeOfDay
+                    };
                     DataService.AgregarTurno(t);
                     DataService.CargarTurnos();
                     t = DataService.Turnos.Last();
                 }
 
+                // --- 4. CREAR ASIGNACIÓN ---
                 DateTime fechaDestino = dpFecha.SelectedDate ?? DateTime.Today;
+
+                // Limpiar asignaciones previas del agente en ese día
                 DataService.EliminarAsignacionPorFecha(_idEmpleadoPreseleccionado, fechaDestino);
 
                 DataService.CrearAsignacion(new Asignacion
@@ -281,9 +267,13 @@ namespace Secorvi
                 this.DialogResult = true;
                 this.Close();
             }
+            catch (FormatException)
+            {
+                MessageBox.Show("ERROR DE FORMATO: Use '07:00 AM'.");
+            }
             catch (Exception ex)
             {
-                MessageBox.Show("ERROR DE FORMATO: Use '07:00 AM'.\nDetalle: " + ex.Message);
+                MessageBox.Show("ERROR DE SISTEMA: " + ex.Message);
             }
         }
 

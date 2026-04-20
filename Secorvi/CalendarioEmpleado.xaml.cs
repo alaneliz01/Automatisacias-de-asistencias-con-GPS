@@ -93,14 +93,15 @@ namespace Secorvi
         {
             if (GridCalendario == null) return;
 
-            // 1. Limpiar visuales
-            var paraEliminar = GridCalendario.Children.OfType<Border>().Where(b => b.Tag?.ToString() == "VISUAL_ASIG").ToList();
+            // 1. Limpiar visuales previos
+            var paraEliminar = GridCalendario.Children.OfType<Border>()
+                .Where(b => b.Tag?.ToString() == "VISUAL_ASIG").ToList();
             foreach (var b in paraEliminar) GridCalendario.Children.Remove(b);
 
             // 2. Cargar desde DB
             DataService.ActualizarTodo();
 
-            // 3. Filtrar (Sincronizado con minúsculas: id_empleado, fecha)
+            // 3. Filtrar asignaciones de la semana
             var asignaciones = DataService.Asignaciones.Where(a =>
                 a.id_empleado == _empleado.id_empleado &&
                 a.fecha.Date >= _lunesActual.Date &&
@@ -112,12 +113,12 @@ namespace Secorvi
 
             foreach (var asig in asignaciones)
             {
-                // Sincronizado con: id_turno (minúscula), id_lugar (minúscula), estatus (minúscula)
                 var turno = DataService.Turnos.FirstOrDefault(t => t.id_turno == asig.id_turno);
                 var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_lugar == asig.id_ubicacion);
 
                 if (turno == null) continue;
 
+                // Contadores para el resumen superior
                 if (asig.estatus == "VACACIONES") vacaciones++;
                 else if (asig.estatus == "DÍA LIBRE") descansos++;
                 else servicios++;
@@ -137,6 +138,7 @@ namespace Secorvi
                     BorderThickness = new Thickness(1),
                     BorderBrush = Brushes.Black,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment = VerticalAlignment.Stretch, // Importante
                     Margin = new Thickness(2)
                 };
 
@@ -154,19 +156,42 @@ namespace Secorvi
                     _ => $"{ubi?.nombre_lugar ?? "PUNTO"}\n{DateTime.Today.Add(turno.hora_inicio):hh:mm tt} - {DateTime.Today.Add(turno.hora_fin):hh:mm tt}".ToUpper()
                 };
 
-                bloque.Child = new TextBlock { Text = texto, Foreground = Brushes.White, FontSize = 7.5, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
+                bloque.Child = new TextBlock
+                {
+                    Text = texto,
+                    Foreground = Brushes.White,
+                    FontSize = 7.5,
+                    FontWeight = FontWeights.Bold,
+                    TextAlignment = TextAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextWrapping = TextWrapping.Wrap
+                };
 
                 int col = (int)asig.fecha.DayOfWeek;
                 col = (col == 0) ? 7 : col;
-                int row = turno.hora_inicio.Hours + 1;
-                int span = (int)(turno.hora_fin - turno.hora_inicio).TotalHours;
-                if (span <= 0) span = 1;
 
-                Grid.SetColumn(bloque, col); Grid.SetRow(bloque, row); Grid.SetRowSpan(bloque, span);
+                int row;
+                int span;
+                if (asig.estatus == "VACACIONES" || asig.estatus == "DÍA LIBRE")
+                {
+                    row = 1;   // Fila 1 es la primera hora después del header
+                    span = 24; // Abarca las 24 celdas del día
+                }
+                else
+                {
+                    // Turno normal
+                    row = turno.hora_inicio.Hours + 1;
+                    // Usamos Math.Max para asegurar que al menos ocupe 1 fila
+                    span = (int)Math.Ceiling((turno.hora_fin - turno.hora_inicio).TotalHours);
+                    if (span <= 0) span = 1;
+                }
+
+                Grid.SetColumn(bloque, col);
+                Grid.SetRow(bloque, row);
+                Grid.SetRowSpan(bloque, span);
                 GridCalendario.Children.Add(bloque);
             }
 
-            // Actualizar etiquetas de contadores
             if (lblTotalServicios != null) lblTotalServicios.Text = servicios.ToString();
             if (lblTotalDescansos != null) lblTotalDescansos.Text = descansos.ToString();
             if (lblTotalVacaciones != null) lblTotalVacaciones.Text = vacaciones.ToString();
