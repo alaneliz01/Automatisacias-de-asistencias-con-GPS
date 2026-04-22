@@ -233,9 +233,7 @@ namespace Secorvi
                 ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == nombrePunto);
 
                 // --- 3. GESTIÓN DE TURNO ---
-                // Buscamos si ya existe el turno por horario
                 var t = DataService.Turnos.FirstOrDefault(x => x.hora_inicio == dtI.TimeOfDay && x.hora_fin == dtF.TimeOfDay);
-
                 if (t == null)
                 {
                     t = new Turno
@@ -246,24 +244,31 @@ namespace Secorvi
                     };
                     DataService.AgregarTurno(t);
                     DataService.CargarTurnos();
-                    t = DataService.Turnos.Last();
+                    t = DataService.Turnos.FirstOrDefault(x => x.hora_inicio == dtI.TimeOfDay && x.hora_fin == dtF.TimeOfDay);
                 }
 
                 // --- 4. CREAR ASIGNACIÓN ---
                 DateTime fechaDestino = dpFecha.SelectedDate ?? DateTime.Today;
+                MessageBox.Show($"DEBUG:\nEmp: {_idEmpleadoPreseleccionado}\nUbi: {ubi.id_lugar}\nTurno: {t.id_turno}\nFecha: {fechaDestino}");
+                if (ubi == null || ubi.id_lugar <= 0) 
+                    throw new Exception("La ubicación no tiene un ID válido en la base de datos.");
+                if (t == null || t.id_turno <= 0) 
+                    throw new Exception("El turno no tiene un ID válido en la base de datos.");
 
                 // Limpiar asignaciones previas del agente en ese día
                 DataService.EliminarAsignacionPorFecha(_idEmpleadoPreseleccionado, fechaDestino);
 
-                DataService.CrearAsignacion(new Asignacion
+                var nuevaAsignacion = new Asignacion
                 {
                     id_empleado = _idEmpleadoPreseleccionado,
-                    id_ubicacion = ubi.id_lugar,
-                    id_turno = t.id_turno,
-                    fecha = fechaDestino,
+                    id_ubicacion = ubi.id_lugar, 
+                    id_turno = t.id_turno,       
+                    fecha = fechaDestino,        
                     estatus = "PROGRAMADO"
-                });
+                };
 
+                DataService.CrearAsignacion(nuevaAsignacion);
+                MessageBox.Show($"Asignación guardada con éxito:\nLugar: {ubi.nombre_lugar}\nCoordenadas: {ubi.latitud}, {ubi.longitud}\nFecha: {fechaDestino.ToShortDateString()}");
                 this.DialogResult = true;
                 this.Close();
             }

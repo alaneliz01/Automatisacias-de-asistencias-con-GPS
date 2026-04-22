@@ -17,20 +17,29 @@ namespace Secorvi
 
         public static void ActualizarTodo()
         {
-            try
+            CargarEmpleados();
+            CargarAsignaciones(); 
+            CargarTurnos();     
+            // CRUZAMOS LOS DATOS MANUALMENTE (Más seguro que un JOIN de SQL)
+            foreach (var emp in Empleados)
             {
-                CargarEmpleados();
-                CargarUbicaciones();
-                CargarTurnos();
-                VerificarEstadosEspeciales();
-                CargarAsignaciones();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("Sync Error: " + ex.Message);
+                // Buscamos la asignación de HOY para este empleado
+                var asig = Asignaciones.FirstOrDefault(a => a.id_empleado == emp.id_empleado && a.fecha.Date == DateTime.Today);
+
+                if (asig != null)
+                {
+                    // El estatus que n8n pone (PRESENTE / FALTA)
+                    emp.estatus_asistencia = asig.estatus;
+
+                    // Buscamos las horas del turno asignado
+                    var turno = Turnos.FirstOrDefault(t => t.id_turno == asig.id_turno);
+                    if (turno != null)
+                    {
+                        emp.info_turno = $"{DateTime.Today.Add(turno.hora_inicio):hh:mm tt} - {DateTime.Today.Add(turno.hora_fin):hh:mm tt}";
+                    }
+                }
             }
         }
-
         private static void VerificarEstadosEspeciales()
         {
             CrearTurnoSistemaSiNoExiste("VACACIONES");
@@ -52,6 +61,7 @@ namespace Secorvi
             }
         }
 
+
         // --- GESTIÓN DE EMPLEADOS ---
         public static void CargarEmpleados()
         {
@@ -61,23 +71,29 @@ namespace Secorvi
                 try
                 {
                     conn.Open();
-                    // Traemos todos para tener la lista completa en el Panel
+                    // TU QUERY ORIGINAL (Seguro y sin cambios extraños)
                     var cmd = new MySqlCommand("SELECT * FROM empleados WHERE estatus = 'Activo'", conn);
                     using (var r = cmd.ExecuteReader())
                     {
                         while (r.Read())
                         {
-                            Empleados.Add(new Empleado
+                            var emp = new Empleado
                             {
                                 id_empleado = Convert.ToInt32(r["id_empleado"]),
                                 nombre_completo = r["nombre_completo"].ToString(),
                                 telefono = r["telefono"].ToString(),
                                 id_rol = Convert.ToInt32(r["id_rol"]),
                                 estatus = r["estatus"].ToString(),
-                                usuario = r["usuario"].ToString(),     // RE-VINCULADO
+                                usuario = r["usuario"].ToString(),
                                 contrasena = r["contrasena"].ToString(),
-                                matricula = r["matricula"].ToString()   // RE-VINCULADO
-                            });
+                                matricula = r["matricula"].ToString()
+                            };
+
+                            // Inicializamos los valores por defecto para evitar nulos en el Panel
+                            emp.estatus_asistencia = "PENDIENTE";
+                            emp.info_turno = "SIN ASIGNAR";
+
+                            Empleados.Add(emp);
                         }
                     }
                 }

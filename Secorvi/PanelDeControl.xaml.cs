@@ -18,9 +18,31 @@ namespace Secorvi
             this.Loaded += PanelDeControl_Loaded;
             this.Unloaded += PanelDeControl_Unloaded;
         }
+        private void BtnPurgar_Click(object sender, RoutedEventArgs e)
+        {
+            var confirm = MessageBox.Show("¿Desea eliminar registros de asistencia y asignaciones con más de 6 meses de antigüedad?\n\nEsta acción no se puede deshacer.",
+                "MANTENIMIENTO DE SISTEMA", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
+            if (confirm == MessageBoxResult.Yes)
+            {
+                int filas = DataService.PurgarRegistrosAntiguos(6);
+                MessageBox.Show($"Operación completada. Se liberaron {filas} registros de la base de datos.", "ÉXITO");
+                CargarDatosDesdeDB();
+            }
+        }
         private void PanelDeControl_Loaded(object sender, RoutedEventArgs e)
         {
+            // EJECUTAR PURGA: Al cargar el panel, limpiamos registros de más de 6 meses
+            try
+            {
+                int eliminados = DataService.PurgarRegistrosAntiguos(6);
+                if (eliminados > 0)
+                {
+                    System.Diagnostics.Debug.WriteLine($"PURGA AUTOMÁTICA: Se eliminaron {eliminados} registros antiguos.");
+                }
+            }
+            catch { /* Silencioso para no interrumpir al usuario */ }
+
             CargarDatosDesdeDB();
             ConfigurarAutoRefresco();
         }
