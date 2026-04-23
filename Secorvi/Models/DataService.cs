@@ -146,17 +146,22 @@ namespace Secorvi
                         VALUES (@emp, @ubi, @desc, @fec, @ini, @fin, @est)";
 
                 var cmd = new MySqlCommand(query, conn);
+
+                // 1. Manejo de IDs y Fechas (Sin cambios)
                 cmd.Parameters.AddWithValue("@emp", a.id_empleado);
-
-                // REGLA: Si el ID es inválido (0 o menor), usamos el ID 1 de tu script SQL
-                // Esto evita que la Foreign Key rechace la fila.
                 cmd.Parameters.AddWithValue("@ubi", a.id_ubicacion <= 0 ? 1 : a.id_ubicacion);
-
-                cmd.Parameters.AddWithValue("@desc", a.descripcion_del_turno ?? "");
-                cmd.Parameters.AddWithValue("@fec", a.fecha);
+                cmd.Parameters.AddWithValue("@fec", a.fecha.Date);
                 cmd.Parameters.AddWithValue("@ini", a.hora_inicio);
                 cmd.Parameters.AddWithValue("@fin", a.hora_fin);
-                cmd.Parameters.AddWithValue("@est", a.estatus ?? "PROGRAMADO");
+
+                // 2. Descripción: Forzamos máximo 16 caracteres (límite de tu DB)
+                string d = (a.descripcion_del_turno ?? "").Trim();
+                if (d.Length > 16) d = d.Substring(0, 16);
+                cmd.Parameters.Add("@desc", MySqlDbType.VarChar, 16).Value = d;
+                string e = (a.estatus ?? "PROGRAMADO").Trim().ToUpper();
+                if (e.Length > 16) e = e.Substring(0, 16);
+
+                cmd.Parameters.Add("@est", MySqlDbType.VarChar).Value = e;
 
                 conn.Open();
                 cmd.ExecuteNonQuery();
