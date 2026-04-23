@@ -93,15 +93,15 @@ namespace Secorvi
         {
             if (GridCalendario == null) return;
 
-            // 1. Limpiar visuales previos
+            // 1. Limpiar visuales previos (Buscamos por el Tag que asignamos)
             var paraEliminar = GridCalendario.Children.OfType<Border>()
                 .Where(b => b.Tag?.ToString() == "VISUAL_ASIG").ToList();
             foreach (var b in paraEliminar) GridCalendario.Children.Remove(b);
 
-            // 2. Cargar desde DB
+            // 2. Cargar desde DB (Esto actualiza la lista estática en DataService)
             DataService.ActualizarTodo();
 
-            // 3. Filtrar asignaciones de la semana
+            // 3. Filtrar asignaciones de la semana para el empleado actual
             var asignaciones = DataService.Asignaciones.Where(a =>
                 a.id_empleado == _empleado.id_empleado &&
                 a.fecha.Date >= _lunesActual.Date &&
@@ -113,21 +113,20 @@ namespace Secorvi
 
             foreach (var asig in asignaciones)
             {
-                var turno = DataService.Turnos.FirstOrDefault(t => t.id_turno == asig.id_turno);
+                // YA NO buscamos 'turno', los datos están en 'asig'
                 var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_lugar == asig.id_ubicacion);
-
-                if (turno == null) continue;
 
                 // Contadores para el resumen superior
                 if (asig.estatus == "VACACIONES") vacaciones++;
-                else if (asig.estatus == "DÍA LIBRE") descansos++;
+                else if (asig.estatus == "DÍA LIBRE" || asig.descripcion_del_turno == "DÍA LIBRE") descansos++;
                 else servicios++;
 
+                // Definir color según el tipo de asignación
                 Color colorBase = asig.estatus switch
                 {
-                    "VACACIONES" => Color.FromRgb(52, 152, 219),
-                    "DÍA LIBRE" => Color.FromRgb(55, 65, 81),
-                    _ => Color.FromRgb(192, 57, 43)
+                    "VACACIONES" => Color.FromRgb(52, 152, 219), // Azul
+                    "DÍA LIBRE" => Color.FromRgb(55, 65, 81),    // Gris oscuro
+                    _ => Color.FromRgb(192, 57, 43)              // Rojo
                 };
 
                 Border bloque = new Border
@@ -138,10 +137,11 @@ namespace Secorvi
                     BorderThickness = new Thickness(1),
                     BorderBrush = Brushes.Black,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
-                    VerticalAlignment = VerticalAlignment.Stretch, // Importante
+                    VerticalAlignment = VerticalAlignment.Stretch,
                     Margin = new Thickness(2)
                 };
 
+                // Evento para abrir menú contextual al hacer clic en el bloque
                 bloque.MouseLeftButtonDown += (s, ev) => {
                     ev.Handled = true;
                     _fechasSeleccionadas = new List<DateTime> { asig.fecha };
@@ -149,12 +149,15 @@ namespace Secorvi
                     _menuContexto.IsOpen = true;
                 };
 
-                string texto = asig.estatus switch
+                // Construir el texto del bloque usando los nuevos campos
+                string texto;
+                if (asig.estatus == "VACACIONES") texto = "VACACIONES";
+                else if (asig.estatus == "DÍA LIBRE" || asig.descripcion_del_turno == "DÍA LIBRE") texto = "DESCANSO";
+                else
                 {
-                    "VACACIONES" => "VACACIONES",
-                    "DÍA LIBRE" => "DESCANSO",
-                    _ => $"{ubi?.nombre_lugar ?? "PUNTO"}\n{DateTime.Today.Add(turno.hora_inicio):hh:mm tt} - {DateTime.Today.Add(turno.hora_fin):hh:mm tt}".ToUpper()
-                };
+                    // Usamos la descripción y horas que vienen directamente en la asignación
+                    texto = $"{ubi?.nombre_lugar ?? "PUNTO"}\n{asig.descripcion_del_turno}\n{DateTime.Today.Add(asig.hora_inicio):hh:mm tt} - {DateTime.Today.Add(asig.hora_fin):hh:mm tt}".ToUpper();
+                }
 
                 bloque.Child = new TextBlock
                 {
@@ -167,23 +170,25 @@ namespace Secorvi
                     TextWrapping = TextWrapping.Wrap
                 };
 
+                // Calcular columna (Día de la semana)
                 int col = (int)asig.fecha.DayOfWeek;
-                col = (col == 0) ? 7 : col;
+                col = (col == 0) ? 7 : col; // Ajuste para que Domingo sea columna 7
 
                 int row;
                 int span;
-                if (asig.estatus == "VACACIONES" || asig.estatus == "DÍA LIBRE")
+
+                // Lógica de posicionamiento en el Grid (por horas)
+                if (asig.estatus == "VACACIONES" || asig.estatus == "DÍA LIBRE" || asig.descripcion_del_turno == "DÍA LIBRE")
                 {
-                    row = 1;   // Fila 1 es la primera hora después del header
-                    span = 24; // Abarca las 24 celdas del día
+                    row = 1;
+                    span = 24;
                 }
                 else
                 {
-                    // Turno normal
-                    row = turno.hora_inicio.Hours + 1;
-                    // Usamos Math.Max para asegurar que al menos ocupe 1 fila
-                    span = (int)Math.Ceiling((turno.hora_fin - turno.hora_inicio).TotalHours);
-                    if (span <= 0) span = 1;
+                    // Turno normal: La fila corresponde a la hora de inicio (0-23) + 1 por el header
+                    row = asig.hora_inicio.Hours + 1;
+                    span = (int)Math.Ceiling((asig.hora_fin - asig.hora_inicio).TotalHours);
+                    if (span <= 0) span = 1; // Mínimo una fila de altura
                 }
 
                 Grid.SetColumn(bloque, col);
@@ -192,6 +197,7 @@ namespace Secorvi
                 GridCalendario.Children.Add(bloque);
             }
 
+            // Actualizar etiquetas de resumen
             if (lblTotalServicios != null) lblTotalServicios.Text = servicios.ToString();
             if (lblTotalDescansos != null) lblTotalDescansos.Text = descansos.ToString();
             if (lblTotalVacaciones != null) lblTotalVacaciones.Text = vacaciones.ToString();
@@ -208,20 +214,35 @@ namespace Secorvi
 
         private void EjecutarEliminacionSilenciosa()
         {
-            foreach (var f in _fechasSeleccionadas.Select(x => x.Date).Distinct())
-                DataService.EliminarAsignacionPorFecha(_empleado.id_empleado, f);
+            foreach (var fecha in _fechasSeleccionadas.Select(x => x.Date).Distinct())
+            {
+                var asig = DataService.Asignaciones.FirstOrDefault(a => a.id_empleado == _empleado.id_empleado && a.fecha.Date == fecha);
+                if (asig != null)
+                {
+                    DataService.EliminarAsignacion(asig.id_asignacion);
+                }
+            }
             ActualizarVista();
         }
 
-        private void AsignarEstadoEspecial(string t)
+        private void AsignarEstadoEspecial(string estado)
         {
             foreach (var f in _fechasSeleccionadas.Select(x => x.Date).Distinct())
             {
-                DataService.EliminarAsignacionPorFecha(_empleado.id_empleado, f);
-                // Sincronizado con: nombre (minúscula) e id_turno (minúscula)
-                var tE = DataService.Turnos.FirstOrDefault(x => x.nombre == t);
-                if (tE != null)
-                    DataService.CrearAsignacion(new Asignacion { id_empleado = _empleado.id_empleado, id_ubicacion = 0, id_turno = tE.id_turno, fecha = f, estatus = t });
+                // Primero limpiamos lo que haya en esa fecha
+                var asigPrevia = DataService.Asignaciones.FirstOrDefault(a => a.id_empleado == _empleado.id_empleado && a.fecha.Date == f);
+                if (asigPrevia != null) DataService.EliminarAsignacion(asigPrevia.id_asignacion);
+
+                DataService.CrearAsignacion(new Asignacion
+                {
+                    id_empleado = _empleado.id_empleado,
+                    id_ubicacion = 1, // Ubicación genérica o base
+                    descripcion_del_turno = estado.ToUpper(),
+                    fecha = f,
+                    hora_inicio = new TimeSpan(0, 0, 0),
+                    hora_fin = new TimeSpan(0, 0, 0),
+                    estatus = estado.ToUpper()
+                });
             }
             ActualizarVista();
         }
@@ -260,12 +281,27 @@ namespace Secorvi
             {
                 DateTime fechaOrigen = _fechasSeleccionadas.First().Date;
                 DateTime fechaDestino = fechaOrigen.AddDays(1);
+
                 var asigOriginal = DataService.Asignaciones.FirstOrDefault(a => a.id_empleado == _empleado.id_empleado && a.fecha.Date == fechaOrigen);
 
                 if (asigOriginal != null)
                 {
-                    DataService.EliminarAsignacionPorFecha(_empleado.id_empleado, fechaDestino);
-                    var copia = new Asignacion { id_empleado = asigOriginal.id_empleado, id_ubicacion = asigOriginal.id_ubicacion, id_turno = asigOriginal.id_turno, fecha = fechaDestino, estatus = asigOriginal.estatus };
+                    // Limpiar destino si ya existe algo
+                    var asigDestino = DataService.Asignaciones.FirstOrDefault(a => a.id_empleado == _empleado.id_empleado && a.fecha.Date == fechaDestino);
+                    if (asigDestino != null) DataService.EliminarAsignacion(asigDestino.id_asignacion);
+
+                    // Copiar con los nuevos campos de hora y descripción
+                    var copia = new Asignacion
+                    {
+                        id_empleado = asigOriginal.id_empleado,
+                        id_ubicacion = asigOriginal.id_ubicacion,
+                        descripcion_del_turno = asigOriginal.descripcion_del_turno,
+                        fecha = fechaDestino,
+                        hora_inicio = asigOriginal.hora_inicio,
+                        hora_fin = asigOriginal.hora_fin,
+                        estatus = "PROGRAMADO"
+                    };
+
                     DataService.CrearAsignacion(copia);
                     ActualizarVista();
                     MessageBox.Show("Turno copiado al día siguiente.");

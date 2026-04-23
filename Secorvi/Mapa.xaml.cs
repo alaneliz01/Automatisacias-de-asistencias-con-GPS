@@ -195,18 +195,17 @@ namespace Secorvi
 
             try
             {
-                // --- 1. NORMALIZACIÓN DE HORAS (Tu lógica funcional) ---
+                // --- 1. NORMALIZACIÓN DE HORAS ---
                 string inicioRaw = txtHoraInicio.Text.Trim().ToUpper();
                 string finRaw = txtHoraFin.Text.Trim().ToUpper();
 
-                // Asegurar espacios para ParseExact
                 inicioRaw = System.Text.RegularExpressions.Regex.Replace(inicioRaw, @"(\d+)(AM|PM)", "$1 $2");
                 finRaw = System.Text.RegularExpressions.Regex.Replace(finRaw, @"(\d+)(AM|PM)", "$1 $2");
 
                 DateTime dtI = DateTime.ParseExact(inicioRaw, "hh:mm tt", CultureInfo.InvariantCulture);
                 DateTime dtF = DateTime.ParseExact(finRaw, "hh:mm tt", CultureInfo.InvariantCulture);
 
-                // --- 2. GESTIÓN DE UBICACIÓN (CORREGIDO: Sin duplicados) ---
+                // --- 2. GESTIÓN DE UBICACIÓN ---
                 string nombrePunto = txtNombrePunto.Text.Trim().ToUpper();
                 Ubicacion ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == nombrePunto);
 
@@ -228,47 +227,33 @@ namespace Secorvi
                     DataService.ActualizarUbicacion(ubi);
                 }
 
-                // Sincronizar ID de base de datos
+                // Refrescar para asegurar que tenemos el ID de la base de datos
                 DataService.CargarUbicaciones();
                 ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == nombrePunto);
 
-                // --- 3. GESTIÓN DE TURNO ---
-                var t = DataService.Turnos.FirstOrDefault(x => x.hora_inicio == dtI.TimeOfDay && x.hora_fin == dtF.TimeOfDay);
-                if (t == null)
-                {
-                    t = new Turno
-                    {
-                        nombre = nombrePunto.Contains("DESCANSO") ? "DESCANSO" : "TURNO " + dtI.ToString("hh:mm tt"),
-                        hora_inicio = dtI.TimeOfDay,
-                        hora_fin = dtF.TimeOfDay
-                    };
-                    DataService.AgregarTurno(t);
-                    DataService.CargarTurnos();
-                    t = DataService.Turnos.FirstOrDefault(x => x.hora_inicio == dtI.TimeOfDay && x.hora_fin == dtF.TimeOfDay);
-                }
-
-                // --- 4. CREAR ASIGNACIÓN ---
+                // --- 3. CREAR ASIGNACIÓN (Fusionada: Sin clase Turno) ---
                 DateTime fechaDestino = dpFecha.SelectedDate ?? DateTime.Today;
-                MessageBox.Show($"DEBUG:\nEmp: {_idEmpleadoPreseleccionado}\nUbi: {ubi.id_lugar}\nTurno: {t.id_turno}\nFecha: {fechaDestino}");
-                if (ubi == null || ubi.id_lugar <= 0) 
-                    throw new Exception("La ubicación no tiene un ID válido en la base de datos.");
-                if (t == null || t.id_turno <= 0) 
-                    throw new Exception("El turno no tiene un ID válido en la base de datos.");
 
-                // Limpiar asignaciones previas del agente en ese día
+                if (ubi == null || ubi.id_lugar <= 0)
+                    throw new Exception("Error al obtener la ubicación de la base de datos.");
+
+                // Limpiar asignaciones previas de este agente en este día
                 DataService.EliminarAsignacionPorFecha(_idEmpleadoPreseleccionado, fechaDestino);
 
                 var nuevaAsignacion = new Asignacion
                 {
                     id_empleado = _idEmpleadoPreseleccionado,
-                    id_ubicacion = ubi.id_lugar, 
-                    id_turno = t.id_turno,       
-                    fecha = fechaDestino,        
+                    id_ubicacion = ubi.id_lugar,
+                    descripcion_del_turno = nombrePunto.Contains("DESCANSO") ? "DESCANSO" : "TURNO GENERAL",
+                    fecha = fechaDestino,
+                    hora_inicio = dtI.TimeOfDay,
+                    hora_fin = dtF.TimeOfDay,
                     estatus = "PROGRAMADO"
                 };
 
                 DataService.CrearAsignacion(nuevaAsignacion);
-                MessageBox.Show($"Asignación guardada con éxito:\nLugar: {ubi.nombre_lugar}\nCoordenadas: {ubi.latitud}, {ubi.longitud}\nFecha: {fechaDestino.ToShortDateString()}");
+
+                MessageBox.Show("Asignación guardada con éxito.");
                 this.DialogResult = true;
                 this.Close();
             }
@@ -281,6 +266,7 @@ namespace Secorvi
                 MessageBox.Show("ERROR DE SISTEMA: " + ex.Message);
             }
         }
+        
 
         private void BtnEliminarVarios_Click(object sender, RoutedEventArgs e)
         {

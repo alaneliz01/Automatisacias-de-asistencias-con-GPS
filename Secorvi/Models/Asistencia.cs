@@ -18,7 +18,7 @@ namespace Secorvi.Models
         public TimeSpan? HoraFin { get; set; }
 
         public string MetodoRegistro { get; set; } = "GPS";
-        public string Estado { get; set; } = "Entrada";
+       
 
         public double Latitud { get; set; }
         public double Longitud { get; set; }
