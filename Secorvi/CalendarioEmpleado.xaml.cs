@@ -93,12 +93,12 @@ namespace Secorvi
         {
             if (GridCalendario == null) return;
 
-            // 1. Limpiar visuales previos (Buscamos por el Tag que asignamos)
+            // 1. Limpiar visuales previos 
             var paraEliminar = GridCalendario.Children.OfType<Border>()
                 .Where(b => b.Tag?.ToString() == "VISUAL_ASIG").ToList();
             foreach (var b in paraEliminar) GridCalendario.Children.Remove(b);
 
-            // 2. Cargar desde DB (Esto actualiza la lista estática en DataService)
+            // 2. Cargar desde DB 
             DataService.ActualizarTodo();
 
             // 3. Filtrar asignaciones de la semana para el empleado actual
@@ -113,22 +113,40 @@ namespace Secorvi
 
             foreach (var asig in asignaciones)
             {
-                // YA NO buscamos 'turno', los datos están en 'asig'
                 var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_lugar == asig.id_ubicacion);
 
-                // Contadores para el resumen superior
-                if (asig.estatus == "VACACIONES") vacaciones++;
-                else if (asig.estatus == "DÍA LIBRE" || asig.descripcion_del_turno == "DÍA LIBRE") descansos++;
-                else servicios++;
+                // 1. NORMALIZACIÓN (La única que manda)
+                string estatusNorm = asig.estatus?.Trim().ToUpper() ?? "";
+                string turnoNorm = asig.descripcion_del_turno?.Trim().ToUpper() ?? "";
 
-                // Definir color según el tipo de asignación
-                Color colorBase = asig.estatus switch
+                // 2. LÓGICA DE CATEGORÍA
+                // 2. LÓGICA DE CATEGORÍA (Corregida)
+                bool esVacacion = (estatusNorm == "VACACIONES" || turnoNorm == "VACACIONES");
+                bool esDescanso = (estatusNorm == "DÍA LIBRE" || turnoNorm == "DÍA LIBRE" || estatusNorm == "DESCANSO");
+
+                Color colorBase;
+                string texto;
+
+                if (esVacacion)
                 {
-                    "VACACIONES" => Color.FromRgb(52, 152, 219), // Azul
-                    "DÍA LIBRE" => Color.FromRgb(55, 65, 81),    // Gris oscuro
-                    _ => Color.FromRgb(192, 57, 43)              // Rojo
-                };
+                    colorBase = Color.FromRgb(52, 152, 219); // Azul
+                    texto = "VACACIONES";
+                    vacaciones++;
+                }
+                else if (esDescanso)
+                {
+                    colorBase = Color.FromRgb(55, 65, 81);    // Gris oscuro
+                    texto = "DESCANSO";
+                    descansos++;
+                }
+                else
+                {
+                    colorBase = Color.FromRgb(192, 57, 43);   // Rojo
+                    texto = $"{ubi?.nombre_lugar ?? "PUNTO"}\n{asig.descripcion_del_turno}\n{DateTime.Today.Add(asig.hora_inicio):hh:mm tt} - {DateTime.Today.Add(asig.hora_fin):hh:mm tt}".ToUpper();
+                    servicios++;
+                }
 
+                // 3. CREACIÓN DEL BLOQUE (Aseguramos que el contenido sea el texto correcto)
                 Border bloque = new Border
                 {
                     Background = new SolidColorBrush(colorBase),
@@ -138,10 +156,19 @@ namespace Secorvi
                     BorderBrush = Brushes.Black,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     VerticalAlignment = VerticalAlignment.Stretch,
-                    Margin = new Thickness(2)
+                    Margin = new Thickness(2),
+                    Child = new TextBlock
+                    {
+                        Text = texto,
+                        Foreground = Brushes.White,
+                        FontSize = 7.5,
+                        FontWeight = FontWeights.Bold,
+                        TextAlignment = TextAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        TextWrapping = TextWrapping.Wrap
+                    }
                 };
 
-                // Evento para abrir menú contextual al hacer clic en el bloque
                 bloque.MouseLeftButtonDown += (s, ev) => {
                     ev.Handled = true;
                     _fechasSeleccionadas = new List<DateTime> { asig.fecha };
@@ -149,51 +176,29 @@ namespace Secorvi
                     _menuContexto.IsOpen = true;
                 };
 
-                // Construir el texto del bloque usando los nuevos campos
-                string texto;
-                if (asig.estatus == "VACACIONES") texto = "VACACIONES";
-                else if (asig.estatus == "DÍA LIBRE" || asig.descripcion_del_turno == "DÍA LIBRE") texto = "DESCANSO";
-                else
-                {
-                    // Usamos la descripción y horas que vienen directamente en la asignación
-                    texto = $"{ubi?.nombre_lugar ?? "PUNTO"}\n{asig.descripcion_del_turno}\n{DateTime.Today.Add(asig.hora_inicio):hh:mm tt} - {DateTime.Today.Add(asig.hora_fin):hh:mm tt}".ToUpper();
-                }
-
-                bloque.Child = new TextBlock
-                {
-                    Text = texto,
-                    Foreground = Brushes.White,
-                    FontSize = 7.5,
-                    FontWeight = FontWeights.Bold,
-                    TextAlignment = TextAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    TextWrapping = TextWrapping.Wrap
-                };
-
-                // Calcular columna (Día de la semana)
+                // 4. POSICIONAMIENTO BLINDADO
                 int col = (int)asig.fecha.DayOfWeek;
-                col = (col == 0) ? 7 : col; // Ajuste para que Domingo sea columna 7
+                col = (col == 0) ? 7 : col;
 
                 int row;
                 int span;
 
-                // Lógica de posicionamiento en el Grid (por horas)
-                if (asig.estatus == "VACACIONES" || asig.estatus == "DÍA LIBRE" || asig.descripcion_del_turno == "DÍA LIBRE")
+                if (esVacacion || esDescanso)
                 {
                     row = 1;
                     span = 24;
                 }
                 else
                 {
-                    // Turno normal: La fila corresponde a la hora de inicio (0-23) + 1 por el header
                     row = asig.hora_inicio.Hours + 1;
                     span = (int)Math.Ceiling((asig.hora_fin - asig.hora_inicio).TotalHours);
-                    if (span <= 0) span = 1; // Mínimo una fila de altura
+                    if (span <= 0) span = 1;
                 }
 
                 Grid.SetColumn(bloque, col);
                 Grid.SetRow(bloque, row);
                 Grid.SetRowSpan(bloque, span);
+                Panel.SetZIndex(bloque, 10);
                 GridCalendario.Children.Add(bloque);
             }
 
@@ -229,18 +234,17 @@ namespace Secorvi
         {
             foreach (var f in _fechasSeleccionadas.Select(x => x.Date).Distinct())
             {
-                // Primero limpiamos lo que haya en esa fecha
                 var asigPrevia = DataService.Asignaciones.FirstOrDefault(a => a.id_empleado == _empleado.id_empleado && a.fecha.Date == f);
                 if (asigPrevia != null) DataService.EliminarAsignacion(asigPrevia.id_asignacion);
 
                 DataService.CrearAsignacion(new Asignacion
                 {
                     id_empleado = _empleado.id_empleado,
-                    id_ubicacion = 1, // Ubicación genérica o base
-                    descripcion_del_turno = estado.ToUpper(),
+                    id_ubicacion = 0, 
+                    descripcion_del_turno = estado.ToUpper(), 
                     fecha = f,
-                    hora_inicio = new TimeSpan(0, 0, 0),
-                    hora_fin = new TimeSpan(0, 0, 0),
+                    hora_inicio = TimeSpan.Zero,
+                    hora_fin = TimeSpan.Zero,
                     estatus = estado.ToUpper()
                 });
             }

@@ -136,23 +136,27 @@ namespace Secorvi
             }
         }
 
+
         public static void CrearAsignacion(Asignacion a)
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                // Se insertan los datos de turno directamente en la asignación según el nuevo esquema
                 string query = @"INSERT INTO asignaciones 
-                                (id_empleado, id_ubicacion, descripcion_del_turno, fecha, hora_inicio, hora_fin, estatus) 
-                                VALUES (@emp, @ubi, @desc, @fec, @ini, @fin, @est)";
+                        (id_empleado, id_ubicacion, descripcion_del_turno, fecha, hora_inicio, hora_fin, estatus) 
+                        VALUES (@emp, @ubi, @desc, @fec, @ini, @fin, @est)";
 
                 var cmd = new MySqlCommand(query, conn);
                 cmd.Parameters.AddWithValue("@emp", a.id_empleado);
-                cmd.Parameters.AddWithValue("@ubi", a.id_ubicacion);
-                cmd.Parameters.AddWithValue("@desc", a.descripcion_del_turno);
+
+                // REGLA: Si el ID es inválido (0 o menor), usamos el ID 1 de tu script SQL
+                // Esto evita que la Foreign Key rechace la fila.
+                cmd.Parameters.AddWithValue("@ubi", a.id_ubicacion <= 0 ? 1 : a.id_ubicacion);
+
+                cmd.Parameters.AddWithValue("@desc", a.descripcion_del_turno ?? "");
                 cmd.Parameters.AddWithValue("@fec", a.fecha);
                 cmd.Parameters.AddWithValue("@ini", a.hora_inicio);
                 cmd.Parameters.AddWithValue("@fin", a.hora_fin);
-                cmd.Parameters.AddWithValue("@est", "PROGRAMADO");
+                cmd.Parameters.AddWithValue("@est", a.estatus ?? "PROGRAMADO");
 
                 conn.Open();
                 cmd.ExecuteNonQuery();
