@@ -6,6 +6,17 @@ using System.Linq;
 
 namespace Secorvi
 {
+    public class AsignacionReporte
+    {
+        public int id_asignacion { get; set; }
+        public string matricula { get; set; } 
+        public string nombre_agente { get; set; }
+        public string telefono { get; set; } 
+        public string nombre_lugar { get; set; }
+        public string rango_horario { get; set; }
+        public string estatus { get; set; }
+        public DateTime fecha { get; set; }
+    }
     public static class DataService
     {
         private static string connectionString = "Server=localhost;Database=secorvi_db;Uid=root;Pwd=2037888;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
@@ -24,7 +35,6 @@ namespace Secorvi
 
         private static void SincronizarEstatusVistaJefe()
         {
-            // Nota: Cruzamos empleados con sus asignaciones del día para la UI del Jefe
             foreach (var emp in Empleados)
             {
                 var asig = Asignaciones.FirstOrDefault(a => a.id_empleado == emp.id_empleado && a.fecha.Date == DateTime.Today);
@@ -90,7 +100,7 @@ namespace Secorvi
                         {
                             Ubicaciones.Add(new Ubicacion
                             {
-                                id_lugar = Convert.ToInt32(r["id_lugar"]),
+                                id_ubicacion = Convert.ToInt32(r["id_ubicacion"]), // Antes decía id_lugar
                                 nombre_lugar = r["nombre_lugar"].ToString(),
                                 latitud = Convert.ToDecimal(r["latitud"]),
                                 longitud = Convert.ToDecimal(r["longitud"]),
@@ -181,52 +191,59 @@ namespace Secorvi
             }
             CargarAsignaciones();
         }
-        // --- MANTENIMIENTO: PURGA DE DATOS ---
-        public static int PurgarRegistrosAntiguos(int mesesAntiguedad)
+        public static List<AsignacionReporte> ObtenerAsignacionesCompletas()
         {
-            int filasBorradas = 0;
+            List<AsignacionReporte> lista = new List<AsignacionReporte>();
+            string sql = @"
+        SELECT 
+            a.id_asignacion, 
+            e.matricula, 
+            e.nombre_completo AS nombre_agente, 
+            e.telefono,
+            u.nombre_lugar, 
+            CONCAT(TIME_FORMAT(a.hora_inicio, '%H:%i'), ' - ', TIME_FORMAT(a.hora_fin, '%H:%i')) AS rango_horario,
+            a.estatus,
+            a.fecha
+        FROM asignaciones a
+        INNER JOIN empleados e ON a.id_empleado = e.id_empleado
+        INNER JOIN ubicaciones u ON a.id_ubicacion = u.id_ubicacion
+        WHERE a.fecha = CURDATE();";
+
             using (var conn = new MySqlConnection(connectionString))
             {
-                conn.Open();
-                using (var trans = conn.BeginTransaction())
+                try
                 {
-                    try
+                    conn.Open();
+                    using (var cmd = new MySqlCommand(sql, conn))
                     {
-                        // 1. Borrar asistencias antiguas
-                        string sqlAsistencias = "DELETE FROM asistencias WHERE fecha_inicio < DATE_SUB(NOW(), INTERVAL @meses MONTH)";
-                        using (var cmd = new MySqlCommand(sqlAsistencias, conn, trans))
+                        using (var r = cmd.ExecuteReader())
                         {
-                            cmd.Parameters.AddWithValue("@meses", mesesAntiguedad);
-                            filasBorradas += cmd.ExecuteNonQuery();
+                            while (r.Read())
+                            {
+                                lista.Add(new AsignacionReporte
+                                {
+                                    id_asignacion = Convert.ToInt32(r["id_asignacion"]),
+                                    matricula = r["matricula"].ToString(),
+                                    nombre_agente = r["nombre_agente"].ToString(),
+                                    telefono = r["telefono"].ToString(),
+                                    nombre_lugar = r["nombre_lugar"].ToString(),
+                                    rango_horario = r["rango_horario"].ToString(),
+                                    estatus = r["estatus"].ToString(),
+                                    fecha = Convert.ToDateTime(r["fecha"])
+                                });
+                            }
                         }
-
-                        // 2. Borrar asignaciones antiguas
-                        string sqlAsignaciones = "DELETE FROM asignaciones WHERE fecha < DATE_SUB(NOW(), INTERVAL @meses MONTH)";
-                        using (var cmd = new MySqlCommand(sqlAsignaciones, conn, trans))
-                        {
-                            cmd.Parameters.AddWithValue("@meses", mesesAntiguedad);
-                            filasBorradas += cmd.ExecuteNonQuery();
-                        }
-
-                        trans.Commit();
-                        return filasBorradas;
-                    }
-                    catch (Exception ex)
-                    {
-                        trans.Rollback();
-                        System.Diagnostics.Debug.WriteLine("Error en Purga: " + ex.Message);
-                        return -1;
                     }
                 }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex.Message); }
             }
+            return lista;
         }
-        // --- OBTENER SIGUIENTE ID (Para pre-visualización en UI) ---
         public static int ObtenerProximoIdEmpleado()
         {
             int proximoId = 1;
             using (var conn = new MySqlConnection(connectionString))
             {
-                // Consultamos el esquema de la base de datos para saber el siguiente AUTO_INCREMENT
                 string query = @"SELECT AUTO_INCREMENT 
                                 FROM information_schema.TABLES 
                                 WHERE TABLE_SCHEMA = 'secorvi_db' 
@@ -244,8 +261,6 @@ namespace Secorvi
             }
             return proximoId;
         }
-
-        // --- AGREGAR NUEVO EMPLEADO ---
         public static void AgregarEmpleado(Empleado emp)
         {
             using (var conn = new MySqlConnection(connectionString))
@@ -306,12 +321,13 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = "UPDATE ubicaciones SET latitud = @lat, longitud = @lng, radio_permitido = @rad WHERE id_lugar = @id";
+                // SQL corregido con id_ubicacion
+                string query = "UPDATE ubicaciones SET latitud = @lat, longitud = @lng, radio_permitido = @rad WHERE id_ubicacion = @id";
                 var cmd = new MySqlCommand(query, conn);
                 cmd.Parameters.AddWithValue("@lat", u.latitud);
                 cmd.Parameters.AddWithValue("@lng", u.longitud);
                 cmd.Parameters.AddWithValue("@rad", u.radio_permitido);
-                cmd.Parameters.AddWithValue("@id", u.id_lugar);
+                cmd.Parameters.AddWithValue("@id", u.id_ubicacion); // Antes u.id_lugar
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -325,10 +341,11 @@ namespace Secorvi
                 conn.Open();
                 foreach (var ubi in lista)
                 {
-                    string query = "DELETE FROM ubicaciones WHERE id_lugar = @id";
+                    // CORRECCIÓN: DELETE FROM ubicaciones WHERE id_ubicacion = @id
+                    string query = "DELETE FROM ubicaciones WHERE id_ubicacion = @id"; // Antes id_lugar
                     using (var cmd = new MySqlCommand(query, conn))
                     {
-                        cmd.Parameters.AddWithValue("@id", ubi.id_lugar);
+                        cmd.Parameters.AddWithValue("@id", ubi.id_ubicacion);
                         cmd.ExecuteNonQuery();
                     }
                 }

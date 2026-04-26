@@ -13,10 +13,12 @@ namespace Secorvi
 {
     public partial class Mapa : Window
     {
+        
         private double _selectedLat = 0;
         private double _selectedLng = 0;
         private int _idEmpleadoPreseleccionado;
         private DateTime _fechaAsignacion;
+
 
         public Mapa(int idEmpleado = 0, DateTime? fechaAsignacion = null)
         {
@@ -29,11 +31,35 @@ namespace Secorvi
             var emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == _idEmpleadoPreseleccionado);
             if (lblEmpleadoActivo != null)
                 lblEmpleadoActivo.Text = $"AGENTE: {(emp?.nombre_completo ?? "---").ToUpper()}";
+            List<string> horas = new List<string>();
+            for (int h = 1; h <= 12; h++)
+            {
+                horas.Add($"{h:D2}:00");
+                horas.Add($"{h:D2}:30");
+            }
+            cbHoraInicio.ItemsSource = horas;
+            cbHoraFin.ItemsSource = horas;
+            cbHoraInicio.Text = "07:00";
+            cbHoraFin.Text = "03:00";
 
             this.Loaded += async (s, e) => {
                 await InitMap();
                 RefrescarListaUbicaciones();
             };
+        }
+
+        private void LlenarDropdownsHoras()
+        {
+            List<string> horas = new List<string>();
+            for (int h = 1; h <= 12; h++)
+            {
+                horas.Add($"{h:D2}:00");
+                horas.Add($"{h:D2}:30");
+            }
+            cbHoraInicio.ItemsSource = horas;
+            cbHoraFin.ItemsSource = horas;
+            cbHoraInicio.Text = "07:00";
+            cbHoraFin.Text = "03:00";
         }
 
         private async Task InitMap()
@@ -177,35 +203,64 @@ namespace Secorvi
                 txtNombrePunto.Text = u.nombre_lugar;
                 _selectedLat = (double)u.latitud;
                 _selectedLng = (double)u.longitud;
-                txtCoords.Text = string.Format("{0:F6}, {1:F6}", _selectedLat, _selectedLng);
-                mapaWebView.ExecuteScriptAsync(string.Format("window.updatePos({0}, {1})",
-                    _selectedLat.ToString(CultureInfo.InvariantCulture),
-                    _selectedLng.ToString(CultureInfo.InvariantCulture)));
+
+                // Usamos CultureInfo.InvariantCulture para asegurar que el punto decimal sea '.' y no ','
+                txtCoords.Text = string.Format(CultureInfo.InvariantCulture, "{0:F6}, {1:F6}", _selectedLat, _selectedLng);
+
+                mapaWebView.ExecuteScriptAsync(string.Format(CultureInfo.InvariantCulture,
+                    "window.updatePos({0}, {1})", _selectedLat, _selectedLng));
             }
         }
 
+        private void BtnTurno8_Click(object sender, RoutedEventArgs e) => AplicarPreajuste(8);
+        private void BtnTurno12_Click(object sender, RoutedEventArgs e) => AplicarPreajuste(12);
+        private void BtnTurno24_Click(object sender, RoutedEventArgs e)
+        {
+            cbHoraInicio.Text = "12:00";
+            cbAmPmI.SelectedIndex = 0; 
+            cbHoraFin.Text = "12:00";
+            cbAmPmF.SelectedIndex = 0;
+        }
+        private void AplicarPreajuste(int horas)
+        {
+            try
+            {
+                string horaStr = cbHoraInicio.Text.Trim();
+                string amPm = (cbAmPmI.SelectedItem as ComboBoxItem).Content.ToString();
+
+                // Parseamos la entrada
+                DateTime entrada = DateTime.ParseExact($"{horaStr} {amPm}",
+                    new[] { "h:mm tt", "hh:mm tt" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
+
+                // Sumamos las horas (8, 12 o 24)
+                DateTime salida = entrada.AddHours(horas);
+
+                // Asignamos el texto (Formato 12h)
+                cbHoraFin.Text = salida.ToString("hh:mm");
+
+                // Seleccionamos AM (index 0) o PM (index 1) basado en el resultado
+                cbAmPmF.SelectedIndex = salida.ToString("tt", CultureInfo.InvariantCulture).ToUpper().Contains("AM") ? 0 : 1;
+            }
+            catch
+            {
+                MessageBox.Show("Formato de entrada inválido en Inicio. Use HH:MM (Ej: 07:00)");
+            }
+        }
         private void BtnGuardar_Click(object sender, RoutedEventArgs e)
         {
-            // Validación de seguridad
-            if (_selectedLat == 0 || string.IsNullOrWhiteSpace(txtHoraInicio.Text))
+            if (_selectedLat == 0 || string.IsNullOrWhiteSpace(cbHoraInicio.Text) || string.IsNullOrWhiteSpace(txtNombrePunto.Text))
             {
-                MessageBox.Show("Seleccione un punto en el mapa.");
+                MessageBox.Show("Por favor, complete el nombre del lugar y seleccione un punto en el mapa.");
                 return;
             }
 
             try
             {
-                // --- 1. NORMALIZACIÓN DE HORAS ---
-                string inicioRaw = txtHoraInicio.Text.Trim().ToUpper();
-                string finRaw = txtHoraFin.Text.Trim().ToUpper();
-
-                inicioRaw = System.Text.RegularExpressions.Regex.Replace(inicioRaw, @"(\d+)(AM|PM)", "$1 $2");
-                finRaw = System.Text.RegularExpressions.Regex.Replace(finRaw, @"(\d+)(AM|PM)", "$1 $2");
-
-                DateTime dtI = DateTime.ParseExact(inicioRaw, "hh:mm tt", CultureInfo.InvariantCulture);
-                DateTime dtF = DateTime.ParseExact(finRaw, "hh:mm tt", CultureInfo.InvariantCulture);
-
-                // --- 2. GESTIÓN DE UBICACIÓN ---
+                string entradaFinal = $"{cbHoraInicio.Text.Trim()} {(cbAmPmI.SelectedItem as ComboBoxItem).Content}";
+                string salidaFinal = $"{cbHoraFin.Text.Trim()} {(cbAmPmF.SelectedItem as ComboBoxItem).Content}";
+                string[] formatos = { "h:mm tt", "hh:mm tt" };
+                DateTime dtI = DateTime.ParseExact(entradaFinal, formatos, CultureInfo.InvariantCulture, DateTimeStyles.None);
+                DateTime dtF = DateTime.ParseExact(salidaFinal, formatos, CultureInfo.InvariantCulture, DateTimeStyles.None);
                 string nombrePunto = txtNombrePunto.Text.Trim().ToUpper();
                 Ubicacion ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == nombrePunto);
 
@@ -227,24 +282,18 @@ namespace Secorvi
                     DataService.ActualizarUbicacion(ubi);
                 }
 
-                // Refrescar para asegurar que tenemos el ID de la base de datos
                 DataService.CargarUbicaciones();
                 ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == nombrePunto);
-
-                // --- 3. CREAR ASIGNACIÓN (Fusionada: Sin clase Turno) ---
                 DateTime fechaDestino = dpFecha.SelectedDate ?? DateTime.Today;
 
-                if (ubi == null || ubi.id_lugar <= 0)
-                    throw new Exception("Error al obtener la ubicación de la base de datos.");
-
-                // Limpiar asignaciones previas de este agente en este día
-                DataService.EliminarAsignacionPorFecha(_idEmpleadoPreseleccionado, fechaDestino);
+                if (ubi == null || ubi.id_ubicacion <= 0)
+                    throw new Exception("Error crítico: No se pudo recuperar el ID de la ubicación.");
 
                 var nuevaAsignacion = new Asignacion
                 {
                     id_empleado = _idEmpleadoPreseleccionado,
-                    id_ubicacion = ubi.id_lugar,
-                    descripcion_del_turno = nombrePunto.Contains("DESCANSO") ? "DESCANSO" : "TURNO GENERAL",
+                    id_ubicacion = ubi.id_ubicacion,
+                    descripcion_del_turno = nombrePunto.Length > 16 ? nombrePunto.Substring(0, 16) : nombrePunto,
                     fecha = fechaDestino,
                     hora_inicio = dtI.TimeOfDay,
                     hora_fin = dtF.TimeOfDay,
@@ -253,20 +302,20 @@ namespace Secorvi
 
                 DataService.CrearAsignacion(nuevaAsignacion);
 
-                MessageBox.Show("Asignación guardada con éxito.");
+                MessageBox.Show("Asignación registrada exitosamente.");
                 this.DialogResult = true;
                 this.Close();
             }
             catch (FormatException)
             {
-                MessageBox.Show("ERROR DE FORMATO: Use '07:00 AM'.");
+                MessageBox.Show("Error de formato: Asegúrese de escribir la hora como HH:MM (Ejemplo: 08:30)");
             }
             catch (Exception ex)
             {
-                MessageBox.Show("ERROR DE SISTEMA: " + ex.Message);
+                MessageBox.Show("Error al guardar: " + ex.Message);
             }
         }
-        
+
 
         private void BtnEliminarVarios_Click(object sender, RoutedEventArgs e)
         {

@@ -113,59 +113,71 @@ namespace Secorvi
 
             foreach (var asig in asignaciones)
             {
-                var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_lugar == asig.id_ubicacion);
+                var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == asig.id_ubicacion);
 
                 // 1. NORMALIZACIÓN (La única que manda)
                 string estatusNorm = asig.estatus?.Trim().ToUpper() ?? "";
                 string turnoNorm = asig.descripcion_del_turno?.Trim().ToUpper() ?? "";
 
-                // 2. LÓGICA DE CATEGORÍA
-                // 2. LÓGICA DE CATEGORÍA (Corregida)
+                // 2.LÓGICA DE CATEGORÍA Y ESTÉTICA INDUSTRIAL
                 bool esVacacion = (estatusNorm == "VACACIONES" || turnoNorm == "VACACIONES");
                 bool esDescanso = (estatusNorm == "DÍA LIBRE" || turnoNorm == "DÍA LIBRE" || estatusNorm == "DESCANSO");
 
                 Color colorBase;
+                Color colorBorde;
                 string texto;
 
                 if (esVacacion)
                 {
-                    colorBase = Color.FromRgb(52, 152, 219); // Azul
-                    texto = "VACACIONES";
+                    colorBase = Color.FromRgb(29, 78, 216); // Azul Profundo
+                    colorBorde = Color.FromRgb(96, 165, 250);
+                    texto = "🛡️ VACACIONES";
                     vacaciones++;
                 }
                 else if (esDescanso)
                 {
-                    colorBase = Color.FromRgb(55, 65, 81);    // Gris oscuro
-                    texto = "DESCANSO";
+                    colorBase = Color.FromRgb(31, 41, 55);  // Gris Carbono (Terminal)
+                    colorBorde = Color.FromRgb(75, 85, 99);
+                    texto = "💤 DESCANSO";
                     descansos++;
                 }
                 else
                 {
-                    colorBase = Color.FromRgb(192, 57, 43);   // Rojo
-                    texto = $"{ubi?.nombre_lugar ?? "PUNTO"}\n{asig.descripcion_del_turno}\n{DateTime.Today.Add(asig.hora_inicio):hh:mm tt} - {DateTime.Today.Add(asig.hora_fin):hh:mm tt}".ToUpper();
+                    // Servicio normal: Estilo Rojo SECORVI
+                    colorBase = Color.FromRgb(153, 27, 27);  // Rojo Industrial
+                    colorBorde = Color.FromRgb(239, 68, 68);
+                    texto = $"{ubi?.nombre_lugar ?? "UBICACIÓN"}\n{asig.descripcion_del_turno}\n{DateTime.Today.Add(asig.hora_inicio):hh:mm tt} - {DateTime.Today.Add(asig.hora_fin):hh:mm tt}".ToUpper();
                     servicios++;
                 }
 
-                // 3. CREACIÓN DEL BLOQUE (Aseguramos que el contenido sea el texto correcto)
+                // 3. CREACIÓN DEL BLOQUE VISUAL
                 Border bloque = new Border
                 {
                     Background = new SolidColorBrush(colorBase),
-                    CornerRadius = new CornerRadius(2),
+                    CornerRadius = new CornerRadius(4),
                     Tag = "VISUAL_ASIG",
-                    BorderThickness = new Thickness(1),
-                    BorderBrush = Brushes.Black,
+                    BorderThickness = new Thickness(1.5, 0, 0, 0), // Solo borde izquierdo para un look moderno
+                    BorderBrush = new SolidColorBrush(colorBorde),
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     VerticalAlignment = VerticalAlignment.Stretch,
-                    Margin = new Thickness(2),
+                    Margin = new Thickness(1),
+                    Padding = new Thickness(4),
+                    Effect = new System.Windows.Media.Effects.DropShadowEffect
+                    {
+                        BlurRadius = 5,
+                        ShadowDepth = 1,
+                        Opacity = 0.3
+                    },
                     Child = new TextBlock
                     {
                         Text = texto,
                         Foreground = Brushes.White,
-                        FontSize = 7.5,
+                        FontSize = 8,
                         FontWeight = FontWeights.Bold,
-                        TextAlignment = TextAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        TextWrapping = TextWrapping.Wrap
+                        TextAlignment = TextAlignment.Left, // Alineado a la izquierda se ve más técnico
+                        VerticalAlignment = VerticalAlignment.Top,
+                        TextWrapping = TextWrapping.Wrap,
+                        Opacity = 0.9
                     }
                 };
 
@@ -182,22 +194,28 @@ namespace Secorvi
 
                 int row;
                 int span;
-
-                if (esVacacion || esDescanso)
+                double totalHoras = (asig.hora_fin - asig.hora_inicio).TotalHours;
+                bool esTurnoCompleto = esVacacion || esDescanso || (asig.hora_inicio == asig.hora_fin);
+                if (esTurnoCompleto)
                 {
-                    row = 1;
-                    span = 24;
+                    row = 1;   
+                    span = 24;  
                 }
                 else
                 {
                     row = asig.hora_inicio.Hours + 1;
-                    span = (int)Math.Ceiling((asig.hora_fin - asig.hora_inicio).TotalHours);
+                    if (totalHoras < 0) totalHoras += 24;
+                    span = (int)Math.Ceiling(totalHoras);
                     if (span <= 0) span = 1;
                 }
 
                 Grid.SetColumn(bloque, col);
                 Grid.SetRow(bloque, row);
                 Grid.SetRowSpan(bloque, span);
+
+                bloque.VerticalAlignment = VerticalAlignment.Stretch;
+                bloque.HorizontalAlignment = HorizontalAlignment.Stretch;
+
                 Panel.SetZIndex(bloque, 10);
                 GridCalendario.Children.Add(bloque);
             }
@@ -207,14 +225,67 @@ namespace Secorvi
             if (lblTotalDescansos != null) lblTotalDescansos.Text = descansos.ToString();
             if (lblTotalVacaciones != null) lblTotalVacaciones.Text = vacaciones.ToString();
         }
+        private void MenuItem_AgregarAsignacion_Click(object sender, RoutedEventArgs e)
+        {
+            if (_fechasSeleccionadas.Count == 0) return;
 
+            var diasSeleccionados = _fechasSeleccionadas.Select(x => x.Date).Distinct().ToList();
+            DateTime fechaBase = diasSeleccionados.First();
+            int maxIdAntes = DataService.Asignaciones.Any() ? DataService.Asignaciones.Max(a => a.id_asignacion) : 0;
+
+            Mapa win = new Mapa(_empleado.id_empleado, fechaBase);
+            win.Owner = Window.GetWindow(this);
+
+            if (win.ShowDialog() == true)
+            {
+                DataService.ActualizarTodo();
+                var asigCreada = DataService.Asignaciones.FirstOrDefault(a => a.id_asignacion > maxIdAntes && a.id_empleado == _empleado.id_empleado);
+
+                if (asigCreada != null)
+                {
+                    DataService.EliminarAsignacion(asigCreada.id_asignacion);
+                    TimeSpan horaFinAjustada = (asigCreada.hora_inicio == asigCreada.hora_fin)
+                                                ? new TimeSpan(23, 59, 59)
+                                                : asigCreada.hora_fin;
+
+                    foreach (var dia in diasSeleccionados)
+                    {
+                        var asigPrevia = DataService.Asignaciones.FirstOrDefault(a => a.id_empleado == _empleado.id_empleado && a.fecha.Date == dia);
+                        if (asigPrevia != null) DataService.EliminarAsignacion(asigPrevia.id_asignacion);
+
+                        var copia = new Asignacion
+                        {
+                            id_empleado = asigCreada.id_empleado,
+                            id_ubicacion = asigCreada.id_ubicacion,
+                            descripcion_del_turno = asigCreada.descripcion_del_turno,
+                            fecha = dia,
+                            hora_inicio = asigCreada.hora_inicio,
+                            hora_fin = horaFinAjustada, // Insertamos el parche
+                            estatus = asigCreada.estatus
+                        };
+
+                        DataService.CrearAsignacion(copia);
+                    }
+                }
+                ActualizarVista();
+            }
+        }
         private void CrearMenuContexto()
         {
             _menuContexto = new ContextMenu();
+
+            var itemAsignar = new MenuItem { Header = "AGREGAR ASIGNACIÓN" };
+            itemAsignar.Click += MenuItem_AgregarAsignacion_Click;
+
             var itemEli = new MenuItem { Header = "ELIMINAR BLOQUE" }; itemEli.Click += (s, e) => EjecutarEliminacionSilenciosa();
             var itemLibre = new MenuItem { Header = "ASIGNAR DESCANSO" }; itemLibre.Click += (s, e) => AsignarEstadoEspecial("DÍA LIBRE");
             var itemVac = new MenuItem { Header = "VACACIONES" }; itemVac.Click += (s, e) => AsignarEstadoEspecial("VACACIONES");
-            _menuContexto.Items.Add(itemEli); _menuContexto.Items.Add(itemLibre); _menuContexto.Items.Add(itemVac);
+
+            _menuContexto.Items.Add(itemAsignar);
+            _menuContexto.Items.Add(new Separator()); 
+            _menuContexto.Items.Add(itemEli);
+            _menuContexto.Items.Add(itemLibre);
+            _menuContexto.Items.Add(itemVac);
         }
 
         private void EjecutarEliminacionSilenciosa()
@@ -251,10 +322,34 @@ namespace Secorvi
             ActualizarVista();
         }
 
-        // Lógica de Selección por Arrastre (Dragging)
-        private void Celda_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) { _dragging = true; _startCell = sender as Border; Mouse.Capture(GridCalendario, CaptureMode.SubTree); LimpiarSeleccionVisual(); }
-        private void Celda_PreviewMouseMove(object sender, MouseEventArgs e) { if (_dragging && _startCell != null && sender is Border c) SeleccionarRango((DateTime)_startCell.Tag, (DateTime)c.Tag); }
-        private void Celda_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e) { _dragging = false; Mouse.Capture(null); if (_fechasSeleccionadas.Count > 0) { _menuContexto.Placement = PlacementMode.MousePoint; _menuContexto.IsOpen = true; } }
+        private void Celda_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _dragging = true;
+            _startCell = sender as Border;
+            Mouse.Capture(GridCalendario, CaptureMode.SubTree);
+            LimpiarSeleccionVisual();
+        }
+
+        private void Celda_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_dragging || _startCell == null) return;
+            if (Mouse.DirectlyOver is Border celdaActual && celdaActual.Tag is DateTime fechaActual)
+            {
+                SeleccionarRango((DateTime)_startCell.Tag, fechaActual);
+            }
+        }
+
+        private void Celda_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            _dragging = false;
+            Mouse.Capture(null);
+
+            if (_fechasSeleccionadas.Count > 0)
+            {
+                _menuContexto.Placement = PlacementMode.MousePoint;
+                _menuContexto.IsOpen = true;
+            }
+        }
 
         private void SeleccionarRango(DateTime inicio, DateTime fin)
         {
@@ -277,8 +372,6 @@ namespace Secorvi
         private void BtnVolver_Click(object sender, RoutedEventArgs e) => NavigationService?.GoBack();
         private void BtnSemanaAtras_Click(object sender, RoutedEventArgs e) { _lunesActual = _lunesActual.AddDays(-7); DibujarGrid(); ActualizarVista(); }
         private void BtnSemanaAdelante_Click(object sender, RoutedEventArgs e) { _lunesActual = _lunesActual.AddDays(7); DibujarGrid(); ActualizarVista(); }
-
-        // MÉTODOS DE MENÚ CONTEXTO (Copiar y Limpiar)
         private void MenuItem_CopiarDia_Click(object sender, RoutedEventArgs e)
         {
             if (_fechasSeleccionadas.Count > 0)
@@ -290,11 +383,10 @@ namespace Secorvi
 
                 if (asigOriginal != null)
                 {
-                    // Limpiar destino si ya existe algo
                     var asigDestino = DataService.Asignaciones.FirstOrDefault(a => a.id_empleado == _empleado.id_empleado && a.fecha.Date == fechaDestino);
                     if (asigDestino != null) DataService.EliminarAsignacion(asigDestino.id_asignacion);
+                    TimeSpan horaFinAjustada = asigOriginal.hora_fin == TimeSpan.Zero ? new TimeSpan(23, 59, 59) : asigOriginal.hora_fin;
 
-                    // Copiar con los nuevos campos de hora y descripción
                     var copia = new Asignacion
                     {
                         id_empleado = asigOriginal.id_empleado,
@@ -302,7 +394,7 @@ namespace Secorvi
                         descripcion_del_turno = asigOriginal.descripcion_del_turno,
                         fecha = fechaDestino,
                         hora_inicio = asigOriginal.hora_inicio,
-                        hora_fin = asigOriginal.hora_fin,
+                        hora_fin = horaFinAjustada, // Usamos la hora parchada
                         estatus = "PROGRAMADO"
                     };
 

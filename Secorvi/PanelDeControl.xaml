@@ -81,7 +81,6 @@
                     <Rectangle Width="1" Fill="#2D323E" Margin="25,5" Height="40"/>
                     <Button Content="+ REGISTRAR AGENTE" Click="BtnNuevo_Click" Style="{StaticResource IndustrialButtonStyle}" Background="#FFB300" Foreground="#0F111A" FontWeight="Black" Width="180" Height="40"/>
                     <Button x:Name="btnRoles" Content="🛡️ PERMISOS" Click="BtnRoles_Click" Style="{StaticResource IndustrialButtonStyle}" Width="110" Height="40" Margin="10,0"/>
-                    <Button Content="🧹 LIMPIAR DB" Click="BtnPurgar_Click" Style="{StaticResource IndustrialButtonStyle}" Width="120" Height="40" Margin="10,0"/>
                 </StackPanel>
                 <Button Content="❌ DAR DE BAJA" Click="BtnEliminar_Click" DockPanel.Dock="Right" Style="{StaticResource IndustrialButtonStyle}" Background="#3D1B1E" Foreground="#FF5252" BorderBrush="#FF5252" Width="150" Height="40"/>
             </DockPanel>
@@ -94,7 +93,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="FILTRAR POR ID, NOMBRE O MATRÍCULA:" Foreground="#6B7280" FontWeight="Bold" VerticalAlignment="Center" FontSize="10" Margin="0,0,15,0"/>
+                <TextBlock Text="FILTRAR POR ID, NOMBRE O TELÉFONO:" Foreground="#6B7280" FontWeight="Bold"  VerticalAlignment="Center"  FontSize="10" Margin="0,0,15,0"/>
                 <TextBox x:Name="txtBusqueda" Grid.Column="1" Height="32" Style="{StaticResource TerminalInputStyle}" TextChanged="TxtBusqueda_TextChanged"/>
                 <TextBlock Grid.Column="2" x:Name="lblTotal" Text="Agentes: 0" Foreground="#4B5563" VerticalAlignment="Center" Margin="15,0,0,0" FontSize="10"/>
             </Grid>
@@ -102,9 +101,9 @@
 
         <Border Grid.Row="2" Background="#0F111A" BorderBrush="#2D323E" BorderThickness="1,0,1,1">
             <DataGrid x:Name="dgEmpleados" AutoGenerateColumns="False" CanUserAddRows="False" 
-                      Background="Transparent" RowHeight="65" HeadersVisibility="Column" 
-                      IsReadOnly="True" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#1A1F26"
-                      BorderThickness="0" MouseDoubleClick="DgEmpleados_MouseDoubleClick">
+          Background="Transparent" RowHeight="65" HeadersVisibility="Column" 
+          IsReadOnly="True" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#1A1F26"
+          BorderThickness="0" MouseDoubleClick="DgEmpleados_MouseDoubleClick">
                 <DataGrid.Columns>
 
                     <DataGridTextColumn Header="ID BOT" Binding="{Binding id_empleado}" Width="80">
@@ -146,6 +145,10 @@
                                                     <Setter Property="Background" Value="#3D1B1E"/>
                                                     <Setter Property="BorderBrush" Value="#FF5252"/>
                                                 </DataTrigger>
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="SIN PROGRAMAR">
+                                                    <Setter Property="Background" Value="#161920"/>
+                                                    <Setter Property="BorderBrush" Value="#4B5563"/>
+                                                </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Border.Style>
@@ -163,7 +166,7 @@
                                             </Ellipse.Style>
                                         </Ellipse>
                                         <TextBlock Text="{Binding estatus_asistencia, TargetNullValue='PENDIENTE'}" 
-                                                   Foreground="White" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                                       Foreground="White" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>
@@ -175,22 +178,36 @@
                             <DataTemplate>
                                 <StackPanel VerticalAlignment="Center" Margin="10,0">
                                     <TextBlock Text="TURNO ACTUAL:" Foreground="#4B5563" FontSize="9" FontWeight="Black"/>
-                                    <TextBlock Text="{Binding info_turno, TargetNullValue='SIN ASIGNACIÓN'}" 
-                                               Foreground="#E0E0E0" FontSize="12" FontFamily="Consolas"/>
+                                    <TextBlock Text="{Binding info_turno, TargetNullValue='N/A'}" 
+                                   Foreground="#E0E0E0" FontSize="12" FontFamily="Consolas"/>
                                 </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="ACCIONES" Width="150">
+                    <DataGridTemplateColumn Header="ACCIONES" Width="220">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Button Content="📅 CALENDARIO" Click="BtnCalendario_Click" Style="{StaticResource IndustrialButtonStyle}" 
-                                        Foreground="#FFB300" BorderBrush="#FFB300" FontSize="10" FontWeight="Bold"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="📅 CALENDARIO" 
+                                Click="BtnCalendario_Click" 
+                                Style="{StaticResource IndustrialButtonStyle}" 
+                                Foreground="#FFB300" 
+                                BorderBrush="#FFB300" 
+                                FontSize="10" 
+                                FontWeight="Bold"
+                                Margin="0,0,5,0"/>
+                                    <Button Content="📍 ASIGNAR TURNO" 
+                                Click="BtnAsignacion_Click" 
+                                Style="{StaticResource IndustrialButtonStyle}" 
+                                Foreground="#2ECC71" 
+                                BorderBrush="#2ECC71" 
+                                FontSize="10" 
+                                FontWeight="Bold"/>
+                                </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-
                 </DataGrid.Columns>
             </DataGrid>
         </Border>

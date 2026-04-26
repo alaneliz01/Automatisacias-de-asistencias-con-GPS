@@ -19,6 +19,22 @@
             <Setter Property="CaretBrush" Value="#FFB300"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
+
+        <Style x:Key="IndustrialButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#1A1F26"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="BorderBrush" Value="#2D323E"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="2">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Border BorderBrush="#2D323E" BorderThickness="1">
@@ -34,7 +50,6 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
@@ -54,11 +69,6 @@
                     <Grid Grid.Row="2" Margin="0,0,0,10">
                         <ListBox x:Name="lstUbicaciones" Background="Transparent" BorderThickness="0" 
                                  SelectionMode="Extended" SelectionChanged="lstUbicaciones_SelectionChanged">
-                            <ListBox.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="🗑️ ELIMINAR SELECCIÓN" Click="BtnEliminarVarios_Click"/>
-                                </ContextMenu>
-                            </ListBox.ContextMenu>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Border Background="#1A1F26" BorderBrush="#2D323E" BorderThickness="1" Padding="10" Margin="0,0,0,5" CornerRadius="2">
@@ -69,35 +79,50 @@
                                     </Border>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
-                            <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem">
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Style.Triggers>
-                                        <Trigger Property="IsSelected" Value="True">
-                                            <Setter Property="BorderBrush" Value="#FFB300"/>
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ListBox.ItemContainerStyle>
                         </ListBox>
                     </Grid>
 
                     <Border Grid.Row="3" Background="#11141B" BorderBrush="#2D323E" BorderThickness="1" Padding="12" Margin="0,0,0,15">
                         <StackPanel>
-                            <UniformGrid Columns="2" Margin="0,0,0,10">
-                                <StackPanel Margin="0,0,4,0">
-                                    <TextBlock Text="HORA ENTRADA" Foreground="#6B7280" FontSize="8" FontWeight="Bold"/>
-                                    <TextBox x:Name="txtHoraInicio" Text="07:00 AM" Style="{StaticResource ModernInput}"/>
-                                </StackPanel>
-                                <StackPanel Margin="4,0,0,0">
-                                    <TextBlock Text="HORA SALIDA" Foreground="#6B7280" FontSize="8" FontWeight="Bold"/>
-                                    <TextBox x:Name="txtHoraFin" Text="02:00 PM" Style="{StaticResource ModernInput}"/>
-                                </StackPanel>
+                            <TextBlock Text="PREAJUSTES DE TURNO" Foreground="#6B7280" FontSize="8" FontWeight="Bold" Margin="0,0,0,5"/>
+                            <UniformGrid Columns="3" Margin="0,0,0,12">
+                                <Button Content="8 HORAS" Click="BtnTurno8_Click" Style="{StaticResource IndustrialButtonStyle}" Height="30" Margin="0,0,4,0"/>
+                                <Button Content="12 HORAS" Click="BtnTurno12_Click" Style="{StaticResource IndustrialButtonStyle}" Height="30" Margin="0,0,4,0"/>
+                                <Button Content="24 HORAS" Click="BtnTurno24_Click" Style="{StaticResource IndustrialButtonStyle}" Height="30"/>
                             </UniformGrid>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                    <TextBlock Text="HORA ENTRADA" Foreground="#6B7280" FontSize="8" FontWeight="Bold"/>
+                                    <DockPanel>
+                                        <ComboBox x:Name="cbAmPmI" DockPanel.Dock="Right" Width="55" Background="#12161D" Foreground="Black">
+                                            <ComboBoxItem Content="AM" IsSelected="True"/>
+                                            <ComboBoxItem Content="PM"/>
+                                        </ComboBox>
+                                        <ComboBox x:Name="cbHoraInicio" IsEditable="True" Background="#12161D" Foreground="Black"/>
+                                    </DockPanel>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                    <TextBlock Text="HORA SALIDA" Foreground="#6B7280" FontSize="8" FontWeight="Bold"/>
+                                    <DockPanel>
+                                        <ComboBox x:Name="cbAmPmF" DockPanel.Dock="Right" Width="55" Background="#12161D" Foreground="Black">
+                                            <ComboBoxItem Content="AM"/>
+                                            <ComboBoxItem Content="PM" IsSelected="True"/>
+                                        </ComboBox>
+                                        <ComboBox x:Name="cbHoraFin" IsEditable="True" Background="#12161D" Foreground="Black"/>
+                                    </DockPanel>
+                                </StackPanel>
+                            </Grid>
+
                             <TextBlock Text="FECHA DE SERVICIO" Foreground="#6B7280" FontSize="8" FontWeight="Bold" Margin="0,0,0,2"/>
                             <DatePicker x:Name="dpFecha" Margin="0,0,0,10"/>
-                            <TextBlock Text="NOMBRE DEL PUNTO / CLIENTE" Foreground="#6B7280" FontSize="8" FontWeight="Bold" Margin="0,0,0,2"/>
+                            <TextBlock Text="PUNTO / CLIENTE" Foreground="#6B7280" FontSize="8" FontWeight="Bold" Margin="0,0,0,2"/>
                             <TextBox x:Name="txtNombrePunto" Style="{StaticResource ModernInput}" Margin="0,0,0,10"/>
                             <Border Background="#0B0D12" Padding="5" BorderBrush="#2D323E" BorderThickness="1">
                                 <TextBlock x:Name="txtCoords" Text="PUNTO NO MARCADO" Foreground="#2ECC71" FontSize="9" HorizontalAlignment="Center" FontWeight="Bold"/>
@@ -105,7 +130,7 @@
                         </StackPanel>
                     </Border>
 
-                    <UniformGrid Grid.Row="5" Columns="2">
+                    <UniformGrid Grid.Row="4" Columns="2">
                         <Button Content="CANCELAR" Click="BtnCancelar_Click" Height="45" Background="#2D323E" Foreground="White" Margin="0,0,5,0" Cursor="Hand"/>
                         <Button Content="GUARDAR" Click="BtnGuardar_Click" Height="45" Background="#FFB300" Foreground="#0F111A" FontWeight="Bold" Cursor="Hand"/>
                     </UniformGrid>

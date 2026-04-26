@@ -18,30 +18,9 @@ namespace Secorvi
             this.Loaded += PanelDeControl_Loaded;
             this.Unloaded += PanelDeControl_Unloaded;
         }
-        private void BtnPurgar_Click(object sender, RoutedEventArgs e)
-        {
-            var confirm = MessageBox.Show("¿Desea eliminar registros de asistencia y asignaciones con más de 6 meses de antigüedad?\n\nEsta acción no se puede deshacer.",
-                "MANTENIMIENTO DE SISTEMA", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-            if (confirm == MessageBoxResult.Yes)
-            {
-                int filas = DataService.PurgarRegistrosAntiguos(6);
-                MessageBox.Show($"Operación completada. Se liberaron {filas} registros de la base de datos.", "ÉXITO");
-                CargarDatosDesdeDB();
-            }
-        }
+        
         private void PanelDeControl_Loaded(object sender, RoutedEventArgs e)
         {
-            // EJECUTAR PURGA: Al cargar el panel, limpiamos registros de más de 6 meses
-            try
-            {
-                int eliminados = DataService.PurgarRegistrosAntiguos(6);
-                if (eliminados > 0)
-                {
-                    System.Diagnostics.Debug.WriteLine($"PURGA AUTOMÁTICA: Se eliminaron {eliminados} registros antiguos.");
-                }
-            }
-            catch { /* Silencioso para no interrumpir al usuario */ }
 
             CargarDatosDesdeDB();
             ConfigurarAutoRefresco();
@@ -57,7 +36,7 @@ namespace Secorvi
             if (_autoRefreshTimer == null)
             {
                 _autoRefreshTimer = new DispatcherTimer();
-                _autoRefreshTimer.Interval = TimeSpan.FromSeconds(30); // Refresco cada 30 seg
+                _autoRefreshTimer.Interval = TimeSpan.FromSeconds(30); 
                 _autoRefreshTimer.Tick += (s, ev) => CargarDatosDesdeDB();
             }
 
@@ -69,10 +48,8 @@ namespace Secorvi
         {
             try
             {
-                // 1. Sincroniza con MySQL (Solo trae los 'Activos' según tu DataService)
                 DataService.ActualizarTodo();
 
-                // 2. Aplicamos el filtro actual para no perder lo que el usuario está escribiendo
                 FiltrarYMostrar();
             }
             catch (Exception ex)
@@ -84,19 +61,15 @@ namespace Secorvi
         private void FiltrarYMostrar()
         {
             string filtro = txtBusqueda.Text?.Trim().ToLower() ?? "";
-
-            // BÚSQUEDA INTELIGENTE: Por ID, Nombre, Matrícula o Teléfono
             var filtrados = DataService.Empleados.Where(x =>
                 x.id_empleado.ToString().Contains(filtro) ||
                 (x.nombre_completo?.ToLower().Contains(filtro) ?? false) ||
-                (x.matricula?.ToLower().Contains(filtro) ?? false) ||
                 (x.telefono?.Contains(filtro) ?? false)
             ).ToList();
 
             dgEmpleados.ItemsSource = null;
             dgEmpleados.ItemsSource = filtrados;
 
-            // Actualizamos el contador visual
             if (lblTotal != null)
                 lblTotal.Text = $"Agentes Activos: {filtrados.Count}";
         }
@@ -115,7 +88,6 @@ namespace Secorvi
         {
             if (dgEmpleados.SelectedItem is Empleado emp)
             {
-                // Seguridad: No borrar al administrador actual
                 if (SesionActual.Usuario?.id_empleado == emp.id_empleado)
                 {
                     MessageBox.Show("ACCESO DENEGADO: No puede dar de baja su propio acceso.", "SEGURIDAD");
@@ -138,21 +110,44 @@ namespace Secorvi
         {
             if (dgEmpleados.SelectedItem is Empleado emp)
             {
-                // Cambia entre Agente (3) y Admin Empleados (2)
-                int nuevoRol = (emp.id_rol == 3) ? 2 : 3;
-                string nombreRol = (nuevoRol == 2) ? "ADMINISTRADOR" : "AGENTE";
+                GestionPermisos ventanaPermisos = new GestionPermisos(emp);
+                ventanaPermisos.Owner = Window.GetWindow(this);
 
-                var res = MessageBox.Show($"¿CAMBIAR ACCESO DE {emp.nombre_completo} A {nombreRol}?",
-                    "GESTIÓN DE PERMISOS", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-                if (res == MessageBoxResult.Yes)
+                if (ventanaPermisos.ShowDialog() == true)
                 {
+                    int nuevoRol = ventanaPermisos.IdRolSeleccionado;
+
                     DataService.CambiarPermisos(emp.id_empleado, nuevoRol);
+
+                    System.Diagnostics.Debug.WriteLine($"SECORVI_LOG: Rol de {emp.nombre_completo} actualizado a ID {nuevoRol}");
+
                     CargarDatosDesdeDB();
+                }
+            }
+            else
+            {
+                MessageBox.Show("Por favor, seleccione un agente de la lista primero.", "AVISO");
+            }
+        }
+        private void BtnAsignacion_Click(object sender, RoutedEventArgs e)
+        {
+            var btn = sender as Button;
+            var emp = btn?.DataContext as Empleado;
+
+            if (emp != null)
+            {
+                Mapa ventanaMapa = new Mapa(emp.id_empleado, DateTime.Today);
+                if (ventanaMapa.ShowDialog() == true)
+                {
+                    DataService.ActualizarTodo();
+                    dgEmpleados.ItemsSource = null;
+                    dgEmpleados.ItemsSource = DataService.Empleados;
+                    lblTotal.Text = $"Agentes: {DataService.Empleados.Count}";
                 }
             }
         }
 
+        
         private void BtnCalendario_Click(object sender, RoutedEventArgs e) => AbrirCalendarioSeleccionado();
 
         private void DgEmpleados_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e) => AbrirCalendarioSeleccionado();
