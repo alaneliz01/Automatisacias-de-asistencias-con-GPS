@@ -19,7 +19,7 @@ namespace Secorvi
     }
     public static class DataService
     {
-        private static string connectionString = "Server=localhost;Database=secorvi_db;Uid=root;Pwd=2037888;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
+        private static string connectionString = "Server=localhost;Database=secorvi_db;Uid=root;Pwd=root;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
 
         public static List<Empleado> Empleados { get; set; } = new List<Empleado>();
         public static List<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
@@ -367,7 +367,49 @@ namespace Secorvi
             }
             CargarEmpleados();
         }
+        public static List<AsignacionDetalle> ObtenerAsignacionesDetalladas()
+        {
+            List<AsignacionDetalle> lista = new List<AsignacionDetalle>();
+            string sql = @"
+        SELECT 
+            a.id_asignacion, 
+            e.id_empleado,
+            e.nombre_completo AS empleado, 
+            u.nombre_lugar AS ubicacion, 
+            CONCAT(TIME_FORMAT(a.hora_inicio, '%H:%i'), ' - ', TIME_FORMAT(a.hora_fin, '%H:%i')) AS turno,
+            a.estatus,
+            a.fecha
+        FROM asignaciones a
+        INNER JOIN empleados e ON a.id_empleado = e.id_empleado
+        INNER JOIN ubicaciones u ON a.id_ubicacion = u.id_ubicacion";
 
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                try
+                {
+                    conn.Open();
+                    using (var cmd = new MySql.Data.MySqlClient.MySqlCommand(sql, conn))
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        while (r.Read())
+                        {
+                            lista.Add(new AsignacionDetalle
+                            {
+                                id_asignaciones = Convert.ToInt32(r["id_asignacion"]),
+                                id_empleado = Convert.ToInt32(r["id_empleado"]),
+                                empleado = r["empleado"].ToString(),
+                                ubicacion = r["ubicacion"].ToString(),
+                                turno = r["turno"].ToString(),
+                                estatus = r["estatus"].ToString(),
+                                fecha = Convert.ToDateTime(r["fecha"])
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex.Message); }
+            }
+            return lista;
+        }
         // --- GESTIÓN DE ASIGNACIONES: ELIMINACIÓN POR FECHA ---
         public static void EliminarAsignacionPorFecha(int idEmpleado, DateTime fecha)
         {

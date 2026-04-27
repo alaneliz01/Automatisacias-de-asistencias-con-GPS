@@ -1,0 +1,235 @@
+﻿<Page x:Class="Secorvi.Turnos"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Turnos" Background="#0B0D12" Language="es-MX">
+
+    <Page.Resources>
+        <SolidColorBrush x:Key="PrimaryYellow" Color="#FFB300"/>
+        <SolidColorBrush x:Key="DeepPanel" Color="#161920"/>
+        <SolidColorBrush x:Key="BorderGray" Color="#2D323E"/>
+        <SolidColorBrush x:Key="TextMuted" Color="#6B7280"/>
+        <SolidColorBrush x:Key="AccentBlue" Color="#3498DB"/>
+
+        <Style x:Key="DarkComboBoxItem" TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Gd" Background="Transparent" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Gd" Property="Background" Value="#2C3E50"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Gd" Property="Background" Value="{StaticResource AccentBlue}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkComboBox" TargetType="ComboBox">
+            <Setter Property="Background" Value="#1A1F26"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderGray}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="5,2"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItem}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton" BorderBrush="{TemplateBinding BorderBrush}" 
+                                          BorderThickness="{TemplateBinding BorderThickness}" 
+                                          Background="{TemplateBinding Background}" Grid.ColumnSpan="2" Focusable="false"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Border" CornerRadius="4" Background="{TemplateBinding Background}" 
+                                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                                            <Path x:Name="Arrow" Fill="White" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" Data="M0,0 L4,4 L8,0 Z"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+
+                            <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False" 
+                                              Content="{TemplateBinding SelectionBoxItem}" 
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" 
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" 
+                                              Margin="8,3,23,3" VerticalAlignment="Center" HorizontalAlignment="Left" />
+
+                            <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                <Grid x:Name="DropDown" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder" Background="#1A1F26" BorderBrush="{StaticResource BorderGray}" BorderThickness="1" CornerRadius="0,0,4,4"/>
+                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="StatCard" TargetType="Border">
+            <Setter Property="Background" Value="#161920"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="15"/>
+            <Setter Property="BorderBrush" Value="#2D323E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="HeaderButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#1A1F26"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#2D323E"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#2C3E50"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource PrimaryYellow}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BackButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#1A1F26"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryYellow}"/>
+            <Setter Property="BorderBrush" Value="#2D323E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource PrimaryYellow}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Page.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource StatCard}" Padding="12" Margin="0,0,0,15">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <Button x:Name="btnExportExcel" Content="📊 EXPORTAR EXCEL" Click="BtnExportExcel_Click" 
+                            Background="{StaticResource PrimaryYellow}" Foreground="Black" FontWeight="Bold" Padding="15,8" BorderThickness="0" Width="146" Height="32" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="◀ VOLVER" Click="BtnVolver_Click" Style="{StaticResource BackButtonStyle}" FontWeight="Bold" FontSize="10" Margin="0,0,15,0"/>
+                    <StackPanel>
+                        <TextBlock Text="MONITOREO DE ASISTENCIA" Foreground="{StaticResource PrimaryYellow}" FontSize="20" FontWeight="Bold"/>
+                        <TextBlock x:Name="lblReloj" Text="00:00:00 PM" Foreground="{StaticResource TextMuted}" FontSize="12"/>
+                    </StackPanel>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Style="{StaticResource StatCard}" Margin="0,0,0,12" Background="#0F111A">
+                <StackPanel Orientation="Horizontal">
+                    <StackPanel Margin="0,0,25,0">
+                        <TextBlock Text="FILTRAR EMPLEADO" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
+                        <ComboBox x:Name="cbEmpleados" Style="{StaticResource DarkComboBox}" Width="250" Height="32" 
+                                  DisplayMemberPath="nombre_completo" SelectedValuePath="id_empleado" SelectionChanged="CbEmpleados_SelectionChanged"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="PERIODO SEMANAL" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="◀" Width="40" Height="32" Style="{StaticResource HeaderButtonStyle}" Click="BtnSemanaAtras_Click"/>
+                            <DatePicker x:Name="dpMaestro" Width="150" Height="32" Margin="5,0" SelectedDateChanged="DpMaestro_SelectedDateChanged"/>
+                            <Button Content="▶" Width="40" Height="32" Style="{StaticResource HeaderButtonStyle}" Click="BtnSemanaAdelante_Click"/>
+                            <TextBlock x:Name="lblRangoTexto" Text="DEL -- AL --" Foreground="{StaticResource AccentBlue}" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Button x:Name="btnLimpiar" Content="LIMPIAR" Width="80" Height="32" Click="BtnLimpiar_Click" Style="{StaticResource HeaderButtonStyle}" Margin="30,0,0,0" VerticalAlignment="Bottom"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="1" Background="#0D1016" BorderBrush="{StaticResource BorderGray}" BorderThickness="1" CornerRadius="8">
+                <DataGrid x:Name="dgAsignaciones" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
+                          Background="Transparent" RowHeight="50" BorderThickness="0" Foreground="White"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#1A1F26">
+                    <DataGrid.Resources>
+                        <Style TargetType="DataGridRow">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#11141B"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                        <Style TargetType="DataGridCell">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="#1A2F45"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="Background" Value="#161920"/>
+                            <Setter Property="Foreground" Value="{StaticResource PrimaryYellow}"/>
+                            <Setter Property="Padding" Value="12"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="BorderBrush" Value="{StaticResource BorderGray}"/>
+                            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                        </Style>
+                    </DataGrid.Resources>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="ID" Binding="{Binding IdEmpleado}" Width="50"/>
+                        <DataGridTextColumn Header="EMPLEADO" Binding="{Binding NombreEmpleado}" Width="200"/>
+                        <DataGridTextColumn Header="LUN" Binding="{Binding Lunes}" Width="*"/>
+                        <DataGridTextColumn Header="MAR" Binding="{Binding Martes}" Width="*"/>
+                        <DataGridTextColumn Header="MIÉ" Binding="{Binding Miercoles}" Width="*"/>
+                        <DataGridTextColumn Header="JUE" Binding="{Binding Jueves}" Width="*"/>
+                        <DataGridTextColumn Header="VIE" Binding="{Binding Viernes}" Width="*"/>
+                        <DataGridTextColumn Header="SÁB" Binding="{Binding Sabado}" Width="*"/>
+                        <DataGridTextColumn Header="DOM" Binding="{Binding Domingo}" Width="*"/>
+
+                        <DataGridTextColumn Header="TOTAL" Binding="{Binding TotalSemana}" Width="110">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{StaticResource PrimaryYellow}"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource StatCard}" Padding="10" Margin="0,15,0,0">
+            <TextBlock Text="SECORVI v2.0 | REPORTE SEMANAL" Foreground="{StaticResource TextMuted}" FontSize="9" HorizontalAlignment="Right"/>
+        </Border>
+    </Grid>
+</Page>

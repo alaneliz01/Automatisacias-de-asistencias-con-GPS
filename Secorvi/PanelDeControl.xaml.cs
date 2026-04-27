@@ -57,7 +57,10 @@ namespace Secorvi
                 System.Diagnostics.Debug.WriteLine("SECORVI_LOG: Error en refresco: " + ex.Message);
             }
         }
-
+        private void BtnTurnos_Click(object sender, RoutedEventArgs e)
+        {
+            this.NavigationService.Navigate(new Turnos());
+        }
         private void FiltrarYMostrar()
         {
             string filtro = txtBusqueda.Text?.Trim().ToLower() ?? "";

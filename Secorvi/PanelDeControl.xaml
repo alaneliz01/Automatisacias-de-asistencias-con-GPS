@@ -79,8 +79,11 @@
                         <TextBlock Text="OPERATIONS CONTROL CENTER" Foreground="#4B5563" FontSize="9" FontWeight="Bold" Margin="2,-4,0,0"/>
                     </StackPanel>
                     <Rectangle Width="1" Fill="#2D323E" Margin="25,5" Height="40"/>
+
                     <Button Content="+ REGISTRAR AGENTE" Click="BtnNuevo_Click" Style="{StaticResource IndustrialButtonStyle}" Background="#FFB300" Foreground="#0F111A" FontWeight="Black" Width="180" Height="40"/>
                     <Button x:Name="btnRoles" Content="🛡️ PERMISOS" Click="BtnRoles_Click" Style="{StaticResource IndustrialButtonStyle}" Width="110" Height="40" Margin="10,0"/>
+
+                    <Button x:Name="btnTurnos" Content="🕒 LISTA DE TURNOS" Click="BtnTurnos_Click" Style="{StaticResource IndustrialButtonStyle}" Width="150" Height="40" Margin="0,0,10,0"/>
                 </StackPanel>
                 <Button Content="❌ DAR DE BAJA" Click="BtnEliminar_Click" DockPanel.Dock="Right" Style="{StaticResource IndustrialButtonStyle}" Background="#3D1B1E" Foreground="#FF5252" BorderBrush="#FF5252" Width="150" Height="40"/>
             </DockPanel>
