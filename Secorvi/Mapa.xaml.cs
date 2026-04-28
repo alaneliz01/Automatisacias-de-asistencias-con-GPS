@@ -66,8 +66,13 @@ namespace Secorvi
         {
             try
             {
-                await mapaWebView.EnsureCoreWebView2Async();
+                string rutaAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
+                string rutaCacheWebView2 = System.IO.Path.Combine(rutaAppData, "Secorvi", "MapaCache");
+
+
+                var environment = await CoreWebView2Environment.CreateAsync(null, rutaCacheWebView2);
+                await mapaWebView.EnsureCoreWebView2Async(environment);
                 string html = @"
 <!DOCTYPE html>
 <html>
