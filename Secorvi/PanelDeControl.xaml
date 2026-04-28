@@ -187,6 +187,58 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="ASISTENCIA" Width="160">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border CornerRadius="4" Padding="8,4" Margin="5" BorderThickness="1">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#1A1F26"/>
+                                            <Setter Property="BorderBrush" Value="#2D323E"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="COMPLETA">
+                                                    <Setter Property="Background" Value="#0A2D1B"/>
+                                                    <Setter Property="BorderBrush" Value="#2ECC71"/>
+                                                </DataTrigger>
+
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="RETRASO">
+                                                    <Setter Property="Background" Value="#332B00"/>
+                                                    <Setter Property="BorderBrush" Value="#FFB300"/>
+                                                </DataTrigger>
+
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="PENDIENTE">
+                                                    <Setter Property="Background" Value="#3D1B1E"/>
+                                                    <Setter Property="BorderBrush" Value="#FF5252"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="8" Height="8" Margin="0,0,8,0">
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Fill" Value="#4B5563"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding estatus_asistencia}" Value="COMPLETA">
+                                                            <Setter Property="Fill" Value="#2ECC71"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding estatus_asistencia}" Value="RETRASO">
+                                                            <Setter Property="Fill" Value="#FFB300"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding estatus_asistencia}" Value="PENDIENTE">
+                                                            <Setter Property="Fill" Value="#FF5252"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+                                        <TextBlock Text="{Binding estatus_asistencia, TargetNullValue='PENDIENTE'}" 
+                               Foreground="White" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
 
                     <DataGridTemplateColumn Header="ACCIONES" Width="220">
                         <DataGridTemplateColumn.CellTemplate>

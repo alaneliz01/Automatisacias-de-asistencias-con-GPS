@@ -19,7 +19,7 @@ namespace Secorvi
     }
     public static class DataService
     {
-        private static string connectionString = "Server=localhost;Database=secorvi_db;Uid=root;Pwd=root;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
+        private static string connectionString = "Server=localhost;Database=secorvi_db;Uid=root;Pwd=2037888;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
 
         public static List<Empleado> Empleados { get; set; } = new List<Empleado>();
         public static List<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
