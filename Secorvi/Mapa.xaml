@@ -35,16 +35,54 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="TitleBarButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#6B7280"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#1A1F26"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Border BorderBrush="#2D323E" BorderThickness="1">
         <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="35"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="380"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="#161920" BorderBrush="#2D323E" BorderThickness="0,0,1,0">
+            <Border Grid.Row="0" Grid.ColumnSpan="2" Background="#080A0E" MouseLeftButtonDown="BarraTitulo_MouseLeftButtonDown">
+                <Grid>
+                    <TextBlock Text="SECORVI | VISOR DE MAPA" Foreground="#4B5563" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="15,0,0,0"/>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="🗕" Width="45" Style="{StaticResource TitleBarButton}" Click="BtnMinimizar_Click"/>
+                        <Button Content="🗖" Width="45" Style="{StaticResource TitleBarButton}" Click="BtnMaximizar_Click"/>
+                        <Button Content="✕" Width="45" Style="{StaticResource TitleBarButton}" Click="BtnCerrar_Click" Foreground="#EF4444"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="1" Grid.Column="0" Background="#161920" BorderBrush="#2D323E" BorderThickness="0,0,1,0">
                 <Grid Margin="15">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -137,7 +175,7 @@
                 </Grid>
             </Border>
 
-            <wv2:WebView2 x:Name="mapaWebView" Grid.Column="1" DefaultBackgroundColor="#0F111A"/>
+            <wv2:WebView2 x:Name="mapaWebView" Grid.Row="1" Grid.Column="1" DefaultBackgroundColor="#0F111A"/>
         </Grid>
     </Border>
 </Window>

@@ -2,12 +2,13 @@
 using Secorvi.Models;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Globalization;
+using System.Windows.Input;
 
 namespace Secorvi
 {
@@ -337,6 +338,41 @@ namespace Secorvi
                 }
                 catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
             }
+        }
+        // --- CONTROLES DE LA VENTANA PERSONALIZADA ---
+
+        // Permite arrastrar la ventana manteniendo presionado el clic izquierdo en la barra superior
+        private void BarraTitulo_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                this.DragMove();
+            }
+        }
+
+        // Minimiza la ventana a la barra de tareas
+        private void BtnMinimizar_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
+        }
+
+        // Alterna entre pantalla completa y tamaño normal
+        private void BtnMaximizar_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.WindowState == WindowState.Normal)
+            {
+                this.WindowState = WindowState.Maximized;
+            }
+            else
+            {
+                this.WindowState = WindowState.Normal;
+            }
+        }
+
+
+        private void BtnCerrar_Click(object sender, RoutedEventArgs e)
+        {
+            this.Close();
         }
 
         private void BtnCancelarSeleccion_Click(object sender, RoutedEventArgs e) => lstUbicaciones.UnselectAll();
