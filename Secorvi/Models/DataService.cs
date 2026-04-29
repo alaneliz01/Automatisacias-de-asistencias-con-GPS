@@ -370,18 +370,21 @@ namespace Secorvi
         public static List<AsignacionDetalle> ObtenerAsignacionesDetalladas()
         {
             List<AsignacionDetalle> lista = new List<AsignacionDetalle>();
+
+            // 1. Agregamos a.descripcion_del_turno al SELECT
             string sql = @"
-        SELECT 
-            a.id_asignacion, 
-            e.id_empleado,
-            e.nombre_completo AS empleado, 
-            u.nombre_lugar AS ubicacion, 
-            CONCAT(TIME_FORMAT(a.hora_inicio, '%H:%i'), ' - ', TIME_FORMAT(a.hora_fin, '%H:%i')) AS turno,
-            a.estatus,
-            a.fecha
-        FROM asignaciones a
-        INNER JOIN empleados e ON a.id_empleado = e.id_empleado
-        INNER JOIN ubicaciones u ON a.id_ubicacion = u.id_ubicacion";
+SELECT 
+    a.id_asignacion, 
+    e.id_empleado,
+    e.nombre_completo AS empleado, 
+    u.nombre_lugar AS ubicacion, 
+    CONCAT(TIME_FORMAT(a.hora_inicio, '%H:%i'), ' - ', TIME_FORMAT(a.hora_fin, '%H:%i')) AS turno,
+    a.estatus,
+    a.descripcion_del_turno,
+    a.fecha
+FROM asignaciones a
+INNER JOIN empleados e ON a.id_empleado = e.id_empleado
+INNER JOIN ubicaciones u ON a.id_ubicacion = u.id_ubicacion";
 
             using (var conn = new MySqlConnection(connectionString))
             {
@@ -401,6 +404,8 @@ namespace Secorvi
                                 ubicacion = r["ubicacion"].ToString(),
                                 turno = r["turno"].ToString(),
                                 estatus = r["estatus"].ToString(),
+                                // 2. Mapeamos el dato que viene de la BD
+                                descripcion_del_turno = r["descripcion_del_turno"].ToString(),
                                 fecha = Convert.ToDateTime(r["fecha"])
                             });
                         }

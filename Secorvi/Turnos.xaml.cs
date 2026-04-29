@@ -117,6 +117,7 @@ namespace Secorvi
             dataCruda = dataCruda.Where(x => x.fecha >= _lunesActual && x.fecha <= _domingoActual).ToList();
 
             // 3. Agrupación para la vista de tabla (DataGrid)
+
             var vistaSemanal = dataCruda
                 .GroupBy(x => x.id_empleado)
                 .Select(g => new FilaVistaSemanal
@@ -130,9 +131,12 @@ namespace Secorvi
                     Viernes = GetTurnoTexto(g.ToList(), DayOfWeek.Friday),
                     Sabado = GetTurnoTexto(g.ToList(), DayOfWeek.Saturday),
                     Domingo = GetTurnoTexto(g.ToList(), DayOfWeek.Sunday),
-                    // Contamos turnos reales (excluyendo descansos)
-                    TotalSemana = g.Count(t => !t.turno.ToUpper().Contains("LIBRE") &&
-                                              !t.turno.ToUpper().Contains("DESC")).ToString() + " Turnos"
+
+                    // Usamos GetTurnoTexto para saber exactamente qué días contar
+                    TotalSemana = g.Count(t => {
+                        string estadoDelDia = GetTurnoTexto(g.ToList(), t.fecha.DayOfWeek);
+                        return estadoDelDia != "DESCANSO" && estadoDelDia != "VACACIONES" && estadoDelDia != "-";
+                    }).ToString() + " Turnos"
                 }).ToList();
 
             dgAsignaciones.ItemsSource = vistaSemanal;
@@ -143,9 +147,28 @@ namespace Secorvi
             var t = turnos.FirstOrDefault(x => x.fecha.DayOfWeek == dia);
             if (t == null) return "-";
 
-            string txt = t.turno.ToUpper();
-            // Normalizamos el texto de descanso para que la tabla se vea limpia
-            return (txt.Contains("LIBRE") || txt.Contains("DESCANSO")) ? "DESCANSO" : txt;
+            // 1. Extraemos los datos normalizados (igual que en CalendarioEmpleado)
+            // Nota: Asegúrate de que tu clase AsignacionDetalle tenga las propiedades 'estatus' y 'descripcion_del_turno'
+            string estatusNorm = t.estatus?.Trim().ToUpper() ?? "";
+            string descNorm = t.descripcion_del_turno?.Trim().ToUpper() ?? "";
+            string turnoTxt = t.turno?.Trim().ToUpper() ?? "";
+
+            // 2. Evaluamos la categoría
+            bool esVacacion = estatusNorm == "VACACIONES" || descNorm == "VACACIONES" || turnoTxt.Contains("VACACION");
+            bool esDescanso = estatusNorm == "DÍA LIBRE" || descNorm == "DÍA LIBRE" || estatusNorm == "DESCANSO" || turnoTxt.Contains("LIBRE") || turnoTxt.Contains("DESC");
+
+            if (esVacacion) return "VACACIONES";
+            if (esDescanso) return "DESCANSO";
+
+            // 3. Fallback: Si el texto llega como "00:00 - 00:00" o "00:00 - 23:59" y no es un turno válido
+            // (Útil si tu base de datos a veces no manda el estatus correctamente)
+            if (turnoTxt == "00:00 - 00:00")
+            {
+                return "DESCANSO";
+            }
+
+            // 4. Si es un turno normal, regresamos las horas (ej. "07:00 - 19:00")
+            return turnoTxt;
         }
 
         private void CbEmpleados_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();

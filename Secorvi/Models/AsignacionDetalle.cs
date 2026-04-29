@@ -9,5 +9,6 @@
         public string turno { get; set; }
         public string estatus { get; set; }
         public DateTime fecha { get; set; }
+        public string descripcion_del_turno { get; set; }
     }
 }
