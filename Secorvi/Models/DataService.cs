@@ -41,7 +41,14 @@ namespace Secorvi
                 if (asig != null)
                 {
                     emp.estatus_asistencia = asig.estatus;
-                    emp.info_turno = $"{asig.descripcion_del_turno}: {asig.hora_inicio:hh\\:mm} - {asig.hora_fin:hh\\:mm}";
+                    if (asig.hora_inicio == TimeSpan.Zero && asig.hora_fin == TimeSpan.Zero && asig.estatus != "DESCANSO")
+                    {
+                        emp.info_turno = $"{asig.descripcion_del_turno}: 24 HORAS";
+                    }
+                    else
+                    {
+                        emp.info_turno = $"{asig.descripcion_del_turno}: {asig.hora_inicio:hh\\:mm} - {asig.hora_fin:hh\\:mm}";
+                    }
                 }
                 else
                 {
@@ -354,66 +361,45 @@ namespace Secorvi
         }
 
         // --- GESTIÓN DE EMPLEADOS: ROLES ---
-        public static void CambiarPermisos(int idEmpleado, int nuevoRol)
+        // --- GESTIÓN DE EMPLEADOS: ACTUALIZACIÓN GLOBAL ---
+        public static void ActualizarEmpleado(Empleado emp)
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = "UPDATE empleados SET id_rol = @rol WHERE id_empleado = @id";
+                // Actualizamos el rol y la contraseña basándonos en el objeto Empleado modificado.
+                string query = @"UPDATE empleados 
+                                 SET id_rol = @rol, 
+                                     contrasena = @con 
+                                 WHERE id_empleado = @id";
+
                 var cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@rol", nuevoRol);
-                cmd.Parameters.AddWithValue("@id", idEmpleado);
-                conn.Open();
-                cmd.ExecuteNonQuery();
-            }
-            CargarEmpleados();
-        }
-        public static List<AsignacionDetalle> ObtenerAsignacionesDetalladas()
-        {
-            List<AsignacionDetalle> lista = new List<AsignacionDetalle>();
+                cmd.Parameters.AddWithValue("@rol", emp.id_rol);
+                cmd.Parameters.AddWithValue("@id", emp.id_empleado);
 
-            // 1. Agregamos a.descripcion_del_turno al SELECT
-            string sql = @"
-SELECT 
-    a.id_asignacion, 
-    e.id_empleado,
-    e.nombre_completo AS empleado, 
-    u.nombre_lugar AS ubicacion, 
-    CONCAT(TIME_FORMAT(a.hora_inicio, '%H:%i'), ' - ', TIME_FORMAT(a.hora_fin, '%H:%i')) AS turno,
-    a.estatus,
-    a.descripcion_del_turno,
-    a.fecha
-FROM asignaciones a
-INNER JOIN empleados e ON a.id_empleado = e.id_empleado
-INNER JOIN ubicaciones u ON a.id_ubicacion = u.id_ubicacion";
+                // Manejo táctico de nulos: Si bajaron al usuario a Agente (Rol 3), la contraseña viene como null.
+                // En SQL debemos traducirlo explícitamente a DBNull.Value para limpiar el campo.
+                if (string.IsNullOrEmpty(emp.contrasena))
+                {
+                    cmd.Parameters.AddWithValue("@con", DBNull.Value);
+                }
+                else
+                {
+                    cmd.Parameters.AddWithValue("@con", emp.contrasena);
+                }
 
-            using (var conn = new MySqlConnection(connectionString))
-            {
                 try
                 {
                     conn.Open();
-                    using (var cmd = new MySql.Data.MySqlClient.MySqlCommand(sql, conn))
-                    using (var r = cmd.ExecuteReader())
-                    {
-                        while (r.Read())
-                        {
-                            lista.Add(new AsignacionDetalle
-                            {
-                                id_asignaciones = Convert.ToInt32(r["id_asignacion"]),
-                                id_empleado = Convert.ToInt32(r["id_empleado"]),
-                                empleado = r["empleado"].ToString(),
-                                ubicacion = r["ubicacion"].ToString(),
-                                turno = r["turno"].ToString(),
-                                estatus = r["estatus"].ToString(),
-                                // 2. Mapeamos el dato que viene de la BD
-                                descripcion_del_turno = r["descripcion_del_turno"].ToString(),
-                                fecha = Convert.ToDateTime(r["fecha"])
-                            });
-                        }
-                    }
+                    cmd.ExecuteNonQuery();
                 }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex.Message); }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Error al actualizar empleado: " + ex.Message);
+                }
             }
-            return lista;
+
+            // Refrescamos la lista local para mantener todo el sistema sincronizado
+            CargarEmpleados();
         }
         // --- GESTIÓN DE ASIGNACIONES: ELIMINACIÓN POR FECHA ---
         public static void EliminarAsignacionPorFecha(int idEmpleado, DateTime fecha)
@@ -427,7 +413,7 @@ INNER JOIN ubicaciones u ON a.id_ubicacion = u.id_ubicacion";
                 cmd.Parameters.AddWithValue("@fec", fecha);
 
                 try
-                {
+                { SincronizarEstatusVistaJefe();
                     conn.Open();
                     cmd.ExecuteNonQuery();
                 }

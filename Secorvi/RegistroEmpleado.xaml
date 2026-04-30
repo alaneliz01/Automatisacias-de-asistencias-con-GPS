@@ -1,7 +1,7 @@
 ﻿<Window x:Class="Secorvi.RegistroEmpleado"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SECORVI - Registro" Height="650" Width="380"
+        Title="SECORVI - Registro" Height="560" Width="380"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen">
 
@@ -58,23 +58,23 @@
 
                     <StackPanel Margin="0,0,0,25">
                         <TextBlock Text="IDENTIFICADOR ÚNICO DE AGENTE (BOT ID)" 
-               Foreground="#6B7280" FontSize="10" FontWeight="Bold" 
-               HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                   Foreground="#6B7280" FontSize="10" FontWeight="Bold" 
+                                   HorizontalAlignment="Center" Margin="0,0,0,8"/>
 
                         <Border Background="#0F172A" BorderBrush="#FFB300" BorderThickness="1.5" 
-            Padding="20,10" CornerRadius="8" HorizontalAlignment="Center">
+                                Padding="20,10" CornerRadius="8" HorizontalAlignment="Center">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock Text="ID-" Foreground="#FFB300" FontWeight="Light" 
-                       FontSize="22" VerticalAlignment="Center" Margin="0,2,2,0"/>
+                                           FontSize="22" VerticalAlignment="Center" Margin="0,2,2,0"/>
                                 <TextBlock x:Name="lblIdGenerado" Text="--" 
-                       Foreground="#FFB300" FontWeight="Black" 
-                       FontSize="28" VerticalAlignment="Center"/>
+                                           Foreground="#FFB300" FontWeight="Black" 
+                                           FontSize="28" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
                         <TextBlock Text="ESTE ID ES NECESARIO PARA OPERACIONES DE WHATSAPP" 
-               Foreground="#4B5563" FontSize="8" FontWeight="Bold" 
-               HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                                   Foreground="#4B5563" FontSize="8" FontWeight="Bold" 
+                                   HorizontalAlignment="Center" Margin="0,5,0,0"/>
 
                         <TextBlock x:Name="lblIdRol" Text="3" Visibility="Collapsed"/>
                     </StackPanel>
@@ -88,17 +88,13 @@
                     <TextBox x:Name="txtApellido" Style="{StaticResource TerminalInputStyle}" Margin="0,0,0,15"/>
 
                     <TextBlock Text="WHATSAPP (10 DÍGITOS)" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
-                    <TextBox x:Name="txtTelefono" Style="{StaticResource TerminalInputStyle}" Margin="0,0,0,15" MaxLength="10"/>
-
-                    <TextBlock Text="CONTRASEÑA" Foreground="#6B7280" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
-                    <PasswordBox x:Name="txtPass" Background="#1F2937" Foreground="White" BorderBrush="#374151" 
-                 Padding="10" Margin="0,0,0,25"/>
+                    <TextBox x:Name="txtTelefono" Style="{StaticResource TerminalInputStyle}" Margin="0,0,0,25" MaxLength="10"/>
 
                     <Button Content="REGISTRAR EN SECORVI" Click="BtnGuardar_Click" 
-            Height="45" Style="{StaticResource GoldButtonStyle}"/>
+                            Height="45" Style="{StaticResource GoldButtonStyle}"/>
 
                     <Button Content="CANCELAR OPERACIÓN" Click="BtnCancelar_Click" Margin="0,15,0,0" 
-            Background="Transparent" Foreground="#4B5563" BorderThickness="0" Cursor="Hand" FontSize="10"/>
+                            Background="Transparent" Foreground="#4B5563" BorderThickness="0" Cursor="Hand" FontSize="10"/>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

@@ -1,9 +1,12 @@
 ﻿using Secorvi.Models;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Threading;
 
 namespace Secorvi
@@ -11,17 +14,19 @@ namespace Secorvi
     public partial class PanelDeControl : Page
     {
         private DispatcherTimer _autoRefreshTimer;
+        private ICollectionView _empleadosView;
 
         public PanelDeControl()
         {
             InitializeComponent();
-            this.Loaded += PanelDeControl_Loaded;
-            this.Unloaded += PanelDeControl_Unloaded;
+            this.Loaded += (s, e) =>
+            {
+                CargarDatosDesdeDB();
+            };
         }
-        
+
         private void PanelDeControl_Loaded(object sender, RoutedEventArgs e)
         {
-
             CargarDatosDesdeDB();
             ConfigurarAutoRefresco();
         }
@@ -36,7 +41,7 @@ namespace Secorvi
             if (_autoRefreshTimer == null)
             {
                 _autoRefreshTimer = new DispatcherTimer();
-                _autoRefreshTimer.Interval = TimeSpan.FromSeconds(30); 
+                _autoRefreshTimer.Interval = TimeSpan.FromSeconds(30);
                 _autoRefreshTimer.Tick += (s, ev) => CargarDatosDesdeDB();
             }
 
@@ -44,45 +49,66 @@ namespace Secorvi
                 _autoRefreshTimer.Start();
         }
 
-        private void CargarDatosDesdeDB()
+        private async void CargarDatosDesdeDB()
         {
             try
             {
-                DataService.ActualizarTodo();
+                // 1. Refrescamos toda la información desde MySQL en segundo plano
+                await Task.Run(() => DataService.ActualizarTodo());
 
-                FiltrarYMostrar();
+                // 2. Obtenemos la vista de la colección
+                _empleadosView = CollectionViewSource.GetDefaultView(DataService.Empleados);
+
+                // 3. Configuramos el filtro (mantenemos tu lógica de búsqueda)
+                _empleadosView.Filter = (obj) =>
+                {
+                    if (obj is Empleado emp)
+                    {
+                        string filtro = txtBusqueda.Text?.Trim().ToLower() ?? "";
+                        if (string.IsNullOrEmpty(filtro)) return true;
+
+                        return (emp.nombre_completo?.ToLower().Contains(filtro) ?? false) ||
+                                emp.id_empleado.ToString().Contains(filtro) ||
+                                (emp.telefono?.Contains(filtro) ?? false);
+                    }
+                    return false;
+                };
+
+                // --- CAMBIO CLAVE AQUÍ ---
+                dgEmpleados.ItemsSource = null;
+                dgEmpleados.ItemsSource = _empleadosView;
+
+                // Refrescamos la vista de colección
+                _empleadosView.Refresh();
+
+                ActualizarContadorUI();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("SECORVI_LOG: Error en refresco: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine($"SECORVI_LOG_ERROR: Fallo en refresco: {ex.Message}");
             }
         }
-        private void BtnTurnos_Click(object sender, RoutedEventArgs e)
-        {
-            this.NavigationService.Navigate(new Turnos());
-        }
-        private void FiltrarYMostrar()
-        {
-            string filtro = txtBusqueda.Text?.Trim().ToLower() ?? "";
-            var filtrados = DataService.Empleados.Where(x =>
-                x.id_empleado.ToString().Contains(filtro) ||
-                (x.nombre_completo?.ToLower().Contains(filtro) ?? false) ||
-                (x.telefono?.Contains(filtro) ?? false)
-            ).ToList();
 
-            dgEmpleados.ItemsSource = null;
-            dgEmpleados.ItemsSource = filtrados;
-
-            if (lblTotal != null)
-                lblTotal.Text = $"Agentes Activos: {filtrados.Count}";
+        private void ActualizarContadorUI()
+        {
+            if (lblTotal != null && _empleadosView != null)
+            {
+                
+                int count = _empleadosView.Cast<object>().Count();
+                lblTotal.Text = $"Agentes Activos: {count}";
+            }
         }
 
-        private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e) => FiltrarYMostrar();
+        // Evento de búsqueda optimizado: solo refresca la vista existente
+        private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _empleadosView?.Refresh();
+            ActualizarContadorUI();
+        }
 
         private void BtnNuevo_Click(object sender, RoutedEventArgs e)
         {
-            RegistroEmpleado ventanaRegistro = new RegistroEmpleado();
-            ventanaRegistro.Owner = Window.GetWindow(this);
+            RegistroEmpleado ventanaRegistro = new RegistroEmpleado { Owner = Window.GetWindow(this) };
             if (ventanaRegistro.ShowDialog() == true)
                 CargarDatosDesdeDB();
         }
@@ -111,49 +137,49 @@ namespace Secorvi
 
         private void BtnRoles_Click(object sender, RoutedEventArgs e)
         {
-            if (dgEmpleados.SelectedItem is Empleado emp)
+            GestionPermisos ventanaPermisos = new GestionPermisos { Owner = Window.GetWindow(this) };
+
+            if (ventanaPermisos.ShowDialog() == true)
             {
-                GestionPermisos ventanaPermisos = new GestionPermisos(emp);
-                ventanaPermisos.Owner = Window.GetWindow(this);
+                int idEmpModificado = ventanaPermisos.IdEmpleadoSeleccionado;
+                int nuevoRol = ventanaPermisos.IdRolSeleccionado;
+                string nuevaPass = ventanaPermisos.NuevaContrasena;
 
-                if (ventanaPermisos.ShowDialog() == true)
+                // Buscamos al empleado en la lista local para actualizarlo
+                var emp = DataService.Empleados.FirstOrDefault(x => x.id_empleado == idEmpModificado);
+                if (emp != null)
                 {
-                    int nuevoRol = ventanaPermisos.IdRolSeleccionado;
+                    emp.id_rol = nuevoRol; // Asignamos el nuevo ID (3 para Agente)
+                    emp.contrasena = nuevaPass;
 
-                    DataService.CambiarPermisos(emp.id_empleado, nuevoRol);
+                    // Guardamos en la base de datos
+                    DataService.ActualizarEmpleado(emp);
 
-                    System.Diagnostics.Debug.WriteLine($"SECORVI_LOG: Rol de {emp.nombre_completo} actualizado a ID {nuevoRol}");
-
+                    // Refrescamos la pantalla (Usando el método que ajustamos antes)
                     CargarDatosDesdeDB();
                 }
-            }
-            else
-            {
-                MessageBox.Show("Por favor, seleccione un agente de la lista primero.", "AVISO");
             }
         }
         private void BtnAsignacion_Click(object sender, RoutedEventArgs e)
         {
-            var btn = sender as Button;
-            var emp = btn?.DataContext as Empleado;
-
-            if (emp != null)
+            if ((sender as Button)?.DataContext is Empleado emp)
             {
-                Mapa ventanaMapa = new Mapa(emp.id_empleado, DateTime.Today);
-                if (ventanaMapa.ShowDialog() == true)
-                {
-                    DataService.ActualizarTodo();
-                    dgEmpleados.ItemsSource = null;
-                    dgEmpleados.ItemsSource = DataService.Empleados;
-                    lblTotal.Text = $"Agentes: {DataService.Empleados.Count}";
-                }
+                // Creamos una lista que contenga solo la fecha de hoy
+                var fechas = new List<DateTime> { DateTime.Today };
+
+                // Pasamos la lista al constructor
+                Mapa paginaMapa = new Mapa(emp.id_empleado, fechas);
+
+                // Navegamos
+                this.NavigationService?.Navigate(paginaMapa);
             }
         }
 
-        
-        private void BtnCalendario_Click(object sender, RoutedEventArgs e) => AbrirCalendarioSeleccionado();
+        private void BtnCalendario_Click(object sender, RoutedEventArgs e) =>
+            AbrirCalendarioSeleccionado();
 
-        private void DgEmpleados_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e) => AbrirCalendarioSeleccionado();
+        private void DgEmpleados_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e) =>
+            AbrirCalendarioSeleccionado();
 
         private void AbrirCalendarioSeleccionado()
         {
@@ -162,5 +188,9 @@ namespace Secorvi
                 this.NavigationService?.Navigate(new CalendarioEmpleado(emp));
             }
         }
+
+        private void BtnTurnos_Click(object sender, RoutedEventArgs e)
+        {
+                    }
     }
 }

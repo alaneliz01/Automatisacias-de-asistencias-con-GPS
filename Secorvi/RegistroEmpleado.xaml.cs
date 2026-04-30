@@ -11,7 +11,6 @@ namespace Secorvi
         public RegistroEmpleado()
         {
             InitializeComponent();
-
             lblIdGenerado.Text = DataService.ObtenerProximoIdEmpleado().ToString();
         }
 
@@ -22,10 +21,9 @@ namespace Secorvi
 
         private void BtnGuardar_Click(object sender, RoutedEventArgs e)
         {
-            // Validación de campos requeridos
+            // Validación de campos requeridos (sin contraseña)
             if (string.IsNullOrWhiteSpace(txtNombre.Text) ||
                 string.IsNullOrWhiteSpace(txtApellido.Text) ||
-                string.IsNullOrWhiteSpace(txtPass.Password) ||
                 string.IsNullOrWhiteSpace(txtTelefono.Text))
             {
                 MessageBox.Show("SISTEMA: Todos los campos son obligatorios.", "SECORVI LOG", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -48,13 +46,13 @@ namespace Secorvi
                     return;
                 }
 
-                // Mapeo al Modelo
+                // Mapeo al Modelo (contraseña nula por defecto al ser agente)
                 var nuevoEmpleado = new Empleado
                 {
                     nombre_completo = $"{nombre} {apellido}".ToUpper(),
                     telefono = tel,
                     usuario = usuarioAuto,
-                    contrasena = txtPass.Password,
+                    contrasena = null,
                     id_rol = int.Parse(lblIdRol.Text),
                     estatus = "Activo",
                     matricula = "SEC-" + lblIdGenerado.Text
@@ -62,11 +60,12 @@ namespace Secorvi
 
                 DataService.AgregarEmpleado(nuevoEmpleado);
 
-                // Feedback visual limpio
+                // Feedback visual sin mostrar contraseña
                 MessageBox.Show($"¡REGISTRO EXITOSO!\n\n" +
-                                $"DATOS DE ACCESO:\n" +
+                                $"DATOS DEL AGENTE:\n" +
                                 $"Usuario: {usuarioAuto}\n" +
-                                $"ID Agente: {lblIdGenerado.Text}",
+                                $"ID Agente: {lblIdGenerado.Text}\n\n" +
+                                $"Nota: El acceso al sistema táctico requiere asignación de rol gerencial.",
                                 "SECORVI SYSTEM", MessageBoxButton.OK, MessageBoxImage.Information);
 
                 this.DialogResult = true;

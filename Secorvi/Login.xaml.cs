@@ -1,7 +1,9 @@
 ﻿using Secorvi.Models;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace Secorvi
@@ -11,93 +13,94 @@ namespace Secorvi
         public Login()
         {
             InitializeComponent();
-            InicializarDatos();
+            _ = InicializarSistemaAsync();
         }
 
-        private void InicializarDatos()
+        // --- GESTIÓN DE VENTANA ---
+
+        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left) this.DragMove();
+        }
+
+        private void BtnMin_Click(object sender, RoutedEventArgs e) => this.WindowState = WindowState.Minimized;
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
+
+        private void BtnSalir_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
+
+        // --- LÓGICA DE SISTEMA ---
+
+        private async Task InicializarSistemaAsync()
         {
             try
             {
-                // Esto carga la lista estática en DataService
-                DataService.ActualizarTodo();
-
-                if (DataService.Empleados.Count == 0)
-                {
-                    System.Diagnostics.Debug.WriteLine("LOG: La base de datos está vacía o no hay conexión.");
-                }
+                await Task.Run(() => DataService.ActualizarTodo());
             }
-            catch (Exception ex)
+            catch
             {
-                MostrarAviso("ERROR DE CONEXIÓN: " + ex.Message, "#F8D7DA", "#721C24");
+                MostrarAviso("SYSTEM_ERROR: FALLO DE CONEXIÓN DB", "#3D1B1E", "#FF5252");
             }
         }
 
         private void BtnLogin_Click(object sender, RoutedEventArgs e)
         {
-            string userDigitado = txtUser.Text.Trim();
-            string passDigitada = txtPass.Password.Trim();
+            string user = txtUser.Text.Trim();
+            string pass = txtPass.Password.Trim();
 
-            if (string.IsNullOrEmpty(userDigitado) || string.IsNullOrEmpty(passDigitada))
+            if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(pass))
             {
-                MostrarAviso("CRITICAL: Ingrese usuario y contraseña", "#FFF3CD", "#856404");
+                MostrarAviso("INPUT_REQUIRED: LLENE TODOS LOS CAMPOS", "#332B00", "#FFB300");
                 return;
             }
 
-            // BUSQUEDA: Usamos las propiedades en minúsculas (id_empleado, usuario, contrasena, estatus)
-            // tal como están en tus nuevos Models sincronizados con SQL.
-            var encontrado = DataService.Empleados.FirstOrDefault(x =>
-                x.usuario.Equals(userDigitado, StringComparison.OrdinalIgnoreCase) &&
-                x.contrasena == passDigitada);
+            // Buscamos al usuario en la base de datos (DataService)
+            var usuario = DataService.Empleados.FirstOrDefault(x =>
+                x.usuario.Equals(user, StringComparison.OrdinalIgnoreCase) &&
+                x.contrasena == pass);
 
-            if (encontrado != null)
+            if (usuario != null)
             {
-                // Validamos el ENUM de la base de datos ('Activo')
-                if (!encontrado.estatus.Equals("Activo", StringComparison.OrdinalIgnoreCase))
+                // Verificamos si el agente está activo en la plataforma SECORVI
+                if (!usuario.estatus.Equals("Activo", StringComparison.OrdinalIgnoreCase))
                 {
-                    MostrarAviso("ACCESO DENEGADO: Usuario inactivo", "#F8D7DA", "#721C24");
+                    MostrarAviso("ACCESS_DENIED: CUENTA INACTIVA", "#3D1B1E", "#FF5252");
                     return;
                 }
 
-                // --- INICIO DE SESIÓN ---
-                SesionActual.Usuario = encontrado;
-
-                // Verificamos el rol según los IDs de tu script:
-                // 1 = Super Admin, 2 = Admin Empleados, 3 = Agente
-                if (encontrado.id_rol == 1 || encontrado.id_rol == 2)
+                // Verificamos privilegios de acceso al Command Center (Admin o Supervisor)
+                if (usuario.id_rol == 1 || usuario.id_rol == 2)
                 {
-                    System.Diagnostics.Debug.WriteLine($"LOG: Acceso concedido a {encontrado.nombre_completo} con Rol ID: {encontrado.id_rol}");
+                    // 1. Registramos la sesión globalmente
+                    SesionActual.Usuario = usuario;
 
-                    ContenedorPrincipal principal = new ContenedorPrincipal();
+                    // 2. CORRECCIÓN: Pasamos el objeto 'usuario' al constructor del Contenedor
+                    // Esto permite que el nombre aparezca en la barra superior automáticamente
+                    ContenedorPrincipal principal = new ContenedorPrincipal(usuario);
                     principal.Show();
+
+                    // 3. Cerramos el módulo de autenticación
                     this.Close();
                 }
                 else
                 {
-                    // Si es un Agente (Rol 3), denegamos acceso al panel administrativo de escritorio
-                    MessageBox.Show("ACCESO DENEGADO: Tu rol de Agente solo permite uso de Bot de WhatsApp. Contacta al administrador.", "SEGURIDAD SECORVI");
+                    MessageBox.Show("ACCESO DENEGADO: Tu rol de AGENTE no permite el acceso a esta terminal de escritorio. Use la interfaz de WhatsApp.",
+                                    "SEGURIDAD SECORVI", MessageBoxButton.OK, MessageBoxImage.Stop);
                 }
             }
             else
             {
-                MostrarAviso("ACCESO DENEGADO: Credenciales incorrectas", "#F8D7DA", "#721C24");
+                MostrarAviso("AUTH_FAILURE: CREDENCIALES INVÁLIDAS", "#3D1B1E", "#FF5252");
             }
         }
 
-        private void MostrarAviso(string mensaje, string colorFondo, string colorTexto)
+        private void MostrarAviso(string mensaje, string colorHexFondo, string colorHexTexto)
         {
-            var bc = new BrushConverter();
-            if (brdStatus != null)
-            {
-                brdStatus.Background = (Brush)bc.ConvertFrom(colorFondo);
-                txtStatusMsg.Text = mensaje.ToUpper();
-                txtStatusMsg.Foreground = (Brush)bc.ConvertFrom(colorTexto);
-                brdStatus.Visibility = Visibility.Visible;
-            }
-        }
-
-        private void BtnSalir_Click(object sender, RoutedEventArgs e)
-        {
-            Application.Current.Shutdown();
+            var converter = new BrushConverter();
+            brdStatus.Background = (Brush)converter.ConvertFrom(colorHexFondo);
+            txtStatusMsg.Text = mensaje;
+            txtStatusMsg.Foreground = (Brush)converter.ConvertFrom(colorHexTexto);
+            brdStatus.Visibility = Visibility.Visible;
         }
     }
 }

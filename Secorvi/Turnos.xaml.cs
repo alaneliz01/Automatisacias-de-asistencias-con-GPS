@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using System.Threading.Tasks; // Asegúrate de tener este para Task.Run
 using Microsoft.Win32;
 using ClosedXML.Excel;
 using Secorvi.Models;
@@ -21,17 +22,22 @@ namespace Secorvi
             InitializeComponent();
             IniciarReloj();
 
-            // Usamos el evento Loaded para asegurar que la UI esté lista antes de cargar datos
             this.Loaded += (s, e) => {
                 LoadEmployees();
                 dpMaestro.SelectedDate = DateTime.Today;
+            };
+            this.Unloaded += (s, e) =>
+            {
+                if (_timer != null)
+                {
+                    _timer.Stop();
+                }
             };
         }
 
         private void IniciarReloj()
         {
             _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            // El formato coincide con tu estética profesional de monitoreo
             _timer.Tick += (s, e) => lblReloj.Text = $"| {DateTime.Now:dd 'de' MMMM | hh:mm:ss tt}".ToUpper();
             _timer.Start();
         }
@@ -41,14 +47,10 @@ namespace Secorvi
             try
             {
                 DataService.CargarEmpleados();
-
-                // IMPORTANTE: Para que el ComboBox Dark funcione con DisplayMemberPath="nombre_completo",
-                // el objeto anónimo debe tener exactamente ese nombre de propiedad.
                 var listaConTodos = new List<object> {
                     new { id_empleado = -1, nombre_completo = "-- TODOS LOS EMPLEADOS --" }
                 };
 
-                // Ordenamos por nombre para que sea fácil de buscar
                 var empleadosOrdenados = DataService.Empleados
                     .OrderBy(x => x.nombre_completo)
                     .Select(e => new { e.id_empleado, nombre_completo = e.nombre_completo.ToUpper() });
@@ -63,12 +65,9 @@ namespace Secorvi
             }
             catch (Exception ex)
             {
-                // Evitamos que la app truene si falla la DB, pero podrías loguear el error
                 Console.WriteLine(ex.Message);
             }
         }
-
-        // --- LÓGICA DE NAVEGACIÓN DE SEMANAS ---
 
         private void BtnSemanaAtras_Click(object sender, RoutedEventArgs e)
         {
@@ -87,88 +86,95 @@ namespace Secorvi
             if (dpMaestro.SelectedDate.HasValue)
             {
                 DateTime f = dpMaestro.SelectedDate.Value;
-
-                // Lógica para encontrar el lunes de la semana seleccionada
                 int diff = (7 + (f.DayOfWeek - DayOfWeek.Monday)) % 7;
                 _lunesActual = f.AddDays(-1 * diff).Date;
                 _domingoActual = _lunesActual.AddDays(6).Date;
 
-                // Actualizamos el texto del rango (del Lunes al Domingo)
                 lblRangoTexto.Text = $"DEL {_lunesActual:dd MMM} AL {_domingoActual:dd MMM}".ToUpper();
                 ApplyFilter();
             }
         }
 
-        private void ApplyFilter()
+        private async void ApplyFilter()
         {
-            // Evitamos errores si aún no se cargan datos
             if (dpMaestro.SelectedDate == null) return;
 
-            var dataCruda = DataService.ObtenerAsignacionesDetalladas();
+            dgAsignaciones.ItemsSource = null;
 
-            // 1. Filtro por Empleado (si no es "-- TODOS --")
-            if (cbEmpleados.SelectedValue != null && (int)cbEmpleados.SelectedValue != -1)
+            int idEmpleadoFiltro = cbEmpleados.SelectedValue != null ? (int)cbEmpleados.SelectedValue : -1;
+            DateTime lunes = _lunesActual;
+            DateTime domingo = _domingoActual;
+
+            var vistaSemanal = await Task.Run(() =>
             {
-                int id = (int)cbEmpleados.SelectedValue;
-                dataCruda = dataCruda.Where(x => x.id_empleado == id).ToList();
-            }
+                DataService.CargarAsignaciones();
+                DataService.CargarEmpleados();
 
-            // 2. Filtro por Rango de Fecha Semanal
-            dataCruda = dataCruda.Where(x => x.fecha >= _lunesActual && x.fecha <= _domingoActual).ToList();
+                var asignaciones = DataService.Asignaciones
+                    .Where(x => x.fecha >= lunes && x.fecha <= domingo)
+                    .ToList();
 
-            // 3. Agrupación para la vista de tabla (DataGrid)
-
-            var vistaSemanal = dataCruda
-                .GroupBy(x => x.id_empleado)
-                .Select(g => new FilaVistaSemanal
+                if (idEmpleadoFiltro != -1)
                 {
-                    IdEmpleado = g.Key,
-                    NombreEmpleado = g.First().empleado.ToUpper(),
-                    Lunes = GetTurnoTexto(g.ToList(), DayOfWeek.Monday),
-                    Martes = GetTurnoTexto(g.ToList(), DayOfWeek.Tuesday),
-                    Miercoles = GetTurnoTexto(g.ToList(), DayOfWeek.Wednesday),
-                    Jueves = GetTurnoTexto(g.ToList(), DayOfWeek.Thursday),
-                    Viernes = GetTurnoTexto(g.ToList(), DayOfWeek.Friday),
-                    Sabado = GetTurnoTexto(g.ToList(), DayOfWeek.Saturday),
-                    Domingo = GetTurnoTexto(g.ToList(), DayOfWeek.Sunday),
+                    asignaciones = asignaciones.Where(x => x.id_empleado == idEmpleadoFiltro).ToList();
+                }
 
-                    // Usamos GetTurnoTexto para saber exactamente qué días contar
-                    TotalSemana = g.Count(t => {
-                        string estadoDelDia = GetTurnoTexto(g.ToList(), t.fecha.DayOfWeek);
-                        return estadoDelDia != "DESCANSO" && estadoDelDia != "VACACIONES" && estadoDelDia != "-";
-                    }).ToString() + " Turnos"
-                }).ToList();
+                var resultado = new List<FilaVistaSemanal>();
+                var grupos = asignaciones.GroupBy(x => x.id_empleado);
+
+                foreach (var g in grupos)
+                {
+                    var empleadoInfo = DataService.Empleados.FirstOrDefault(e => e.id_empleado == g.Key);
+                    if (empleadoInfo == null) continue;
+
+                    var fila = new FilaVistaSemanal
+                    {
+                        IdEmpleado = g.Key,
+                        NombreEmpleado = empleadoInfo.nombre_completo.ToUpper(),
+                        Lunes = GetTurnoTexto(g.ToList(), DayOfWeek.Monday),
+                        Martes = GetTurnoTexto(g.ToList(), DayOfWeek.Tuesday),
+                        Miercoles = GetTurnoTexto(g.ToList(), DayOfWeek.Wednesday),
+                        Jueves = GetTurnoTexto(g.ToList(), DayOfWeek.Thursday),
+                        Viernes = GetTurnoTexto(g.ToList(), DayOfWeek.Friday),
+                        Sabado = GetTurnoTexto(g.ToList(), DayOfWeek.Saturday),
+                        Domingo = GetTurnoTexto(g.ToList(), DayOfWeek.Sunday)
+                    };
+
+                    int total = g.Count(t => {
+                        string estado = GetTurnoTexto(new List<Asignacion> { t }, t.fecha.DayOfWeek);
+                        return estado != "DESCANSO" && estado != "VACACIONES" && estado != "-";
+                    });
+
+                    fila.TotalSemana = $"{total} Turnos";
+                    resultado.Add(fila);
+                }
+
+                return resultado.OrderBy(x => x.NombreEmpleado).ToList();
+            });
 
             dgAsignaciones.ItemsSource = vistaSemanal;
         }
 
-        private string GetTurnoTexto(List<AsignacionDetalle> turnos, DayOfWeek dia)
+        private string GetTurnoTexto(List<Asignacion> turnos, DayOfWeek dia)
         {
             var t = turnos.FirstOrDefault(x => x.fecha.DayOfWeek == dia);
             if (t == null) return "-";
 
-            // 1. Extraemos los datos normalizados (igual que en CalendarioEmpleado)
-            // Nota: Asegúrate de que tu clase AsignacionDetalle tenga las propiedades 'estatus' y 'descripcion_del_turno'
             string estatusNorm = t.estatus?.Trim().ToUpper() ?? "";
             string descNorm = t.descripcion_del_turno?.Trim().ToUpper() ?? "";
-            string turnoTxt = t.turno?.Trim().ToUpper() ?? "";
 
-            // 2. Evaluamos la categoría
-            bool esVacacion = estatusNorm == "VACACIONES" || descNorm == "VACACIONES" || turnoTxt.Contains("VACACION");
-            bool esDescanso = estatusNorm == "DÍA LIBRE" || descNorm == "DÍA LIBRE" || estatusNorm == "DESCANSO" || turnoTxt.Contains("LIBRE") || turnoTxt.Contains("DESC");
+            bool esVacacion = estatusNorm == "VACACIONES" || descNorm == "VACACIONES";
+            bool esDescanso = estatusNorm == "DÍA LIBRE" || descNorm == "DÍA LIBRE" || estatusNorm == "DESCANSO" || descNorm.Contains("LIBRE") || descNorm.Contains("DESC");
 
             if (esVacacion) return "VACACIONES";
             if (esDescanso) return "DESCANSO";
 
-            // 3. Fallback: Si el texto llega como "00:00 - 00:00" o "00:00 - 23:59" y no es un turno válido
-            // (Útil si tu base de datos a veces no manda el estatus correctamente)
-            if (turnoTxt == "00:00 - 00:00")
+            if (t.hora_inicio == TimeSpan.Zero && t.hora_fin == TimeSpan.Zero)
             {
-                return "DESCANSO";
+                return "24 HORAS";
             }
 
-            // 4. Si es un turno normal, regresamos las horas (ej. "07:00 - 19:00")
-            return turnoTxt;
+            return $"{t.hora_inicio:hh\\:mm} - {t.hora_fin:hh\\:mm}";
         }
 
         private void CbEmpleados_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();
@@ -181,28 +187,16 @@ namespace Secorvi
 
         private void BtnVolver_Click(object sender, RoutedEventArgs e) => NavigationService?.GoBack();
 
-        // --- EXPORTACIÓN A EXCEL (Usando ClosedXML) ---
-
         private void BtnExportExcel_Click(object sender, RoutedEventArgs e)
         {
             if (dgAsignaciones.ItemsSource == null || !(dgAsignaciones.ItemsSource as List<FilaVistaSemanal>).Any())
             {
-                MessageBox.Show("No hay datos para exportar en esta semana.", "Aviso");
+                MessageBox.Show("No hay datos para exportar.", "Aviso");
                 return;
             }
 
             string nombreSeleccionado = cbEmpleados.Text;
-
-
-            if (string.IsNullOrEmpty(nombreSeleccionado) && cbEmpleados.SelectedItem != null)
-            {
-                dynamic selectedItem = cbEmpleados.SelectedItem;
-                nombreSeleccionado = selectedItem.nombre_completo;
-            }
-
-            string mensaje = $"¿Desea exportar el reporte de: {nombreSeleccionado}?";
-
-            if (MessageBox.Show(mensaje, "Confirmar Exportación", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            if (MessageBox.Show($"¿Desea exportar el reporte?", "Confirmar", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
             {
                 ExportarProceso();
             }
@@ -213,29 +207,22 @@ namespace Secorvi
             try
             {
                 var items = dgAsignaciones.ItemsSource as List<FilaVistaSemanal>;
-                var save = new SaveFileDialog
-                {
-                    Filter = "Excel|*.xlsx",
-                    FileName = $"SECORVI_Reporte_{_lunesActual:dd-MM-yyyy}.xlsx"
-                };
+                var save = new SaveFileDialog { Filter = "Excel|*.xlsx", FileName = $"SECORVI_REPORTE.xlsx" };
 
                 if (save.ShowDialog() == true)
                 {
                     using (var wb = new XLWorkbook())
                     {
-                        var ws = wb.Worksheets.Add("Reporte Asistencia");
-
-                        // Encabezados con estilo
+                        var ws = wb.Worksheets.Add("Reporte");
                         string[] h = { "ID", "EMPLEADO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO", "TOTAL" };
                         for (int i = 0; i < h.Length; i++)
                         {
                             var cell = ws.Cell(1, i + 1);
                             cell.Value = h[i];
                             cell.Style.Font.Bold = true;
-                            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFB300"); // Tu color amarillo
+                            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFB300");
                         }
 
-                        // Llenado de filas
                         int r = 2;
                         foreach (var i in items)
                         {
@@ -251,21 +238,17 @@ namespace Secorvi
                             ws.Cell(r, 10).Value = i.TotalSemana;
                             r++;
                         }
-
-                        ws.Columns().AdjustToContents(); // Auto-ajuste de columnas
+                        ws.Columns().AdjustToContents();
                         wb.SaveAs(save.FileName);
-                        MessageBox.Show("¡Reporte generado con éxito!", "Secorvi System", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show("¡Exportado!");
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error al generar Excel: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
         }
     }
 
-    // Clase de soporte para la vista
+    // CLASE DE SOPORTE (Crucial para que no marque error)
     public class FilaVistaSemanal
     {
         public int IdEmpleado { get; set; }

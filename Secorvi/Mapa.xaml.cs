@@ -8,198 +8,175 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 
 namespace Secorvi
 {
-    public partial class Mapa : Window
+    public partial class Mapa : Page
     {
-        
-        private double _selectedLat = 0;
-        private double _selectedLng = 0;
-        private int _idEmpleadoPreseleccionado;
-        private DateTime _fechaAsignacion;
+        private double _selectedLat = 0, _selectedLng = 0;
+        private int _idEmpleado;
+        private int _idUbicacionSeleccionada = 0; // Para guardar el ID de la tabla ubicaciones
+        private List<DateTime> _fechasDestino;
 
-
-        public Mapa(int idEmpleado = 0, DateTime? fechaAsignacion = null)
+        public Mapa(int idEmpleado, List<DateTime> fechas)
         {
             InitializeComponent();
-            _idEmpleadoPreseleccionado = idEmpleado;
-            _fechaAsignacion = fechaAsignacion ?? DateTime.Today;
+            _idEmpleado = idEmpleado;
+            _fechasDestino = fechas;
 
-            if (dpFecha != null) dpFecha.SelectedDate = _fechaAsignacion;
+            ConfigurarDropdownsHoras();
+            RefrescarListaUbicaciones();
+            _ = InitMap();
 
-            var emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == _idEmpleadoPreseleccionado);
-            if (lblEmpleadoActivo != null)
-                lblEmpleadoActivo.Text = $"AGENTE: {(emp?.nombre_completo ?? "---").ToUpper()}";
-            List<string> horas = new List<string>();
-            for (int h = 1; h <= 12; h++)
-            {
-                horas.Add($"{h:D2}:00");
-                horas.Add($"{h:D2}:30");
-            }
-            cbHoraInicio.ItemsSource = horas;
-            cbHoraFin.ItemsSource = horas;
-            cbHoraInicio.Text = "07:00";
-            cbHoraFin.Text = "03:00";
-
-            this.Loaded += async (s, e) => {
-                await InitMap();
-                RefrescarListaUbicaciones();
-            };
+            // lblInfoAsignacion eliminado para evitar errores ya que no existe en tu XAML
         }
 
-        private void LlenarDropdownsHoras()
+        private void ConfigurarDropdownsHoras()
         {
-            List<string> horas = new List<string>();
-            for (int h = 1; h <= 12; h++)
+            var listaHoras = new List<string>();
+            for (int i = 1; i <= 12; i++)
             {
-                horas.Add($"{h:D2}:00");
-                horas.Add($"{h:D2}:30");
+                listaHoras.Add($"{i:D2}:00");
+                listaHoras.Add($"{i:D2}:30");
             }
-            cbHoraInicio.ItemsSource = horas;
-            cbHoraFin.ItemsSource = horas;
-            cbHoraInicio.Text = "07:00";
-            cbHoraFin.Text = "03:00";
-        }
+            cbHoraInicio.ItemsSource = listaHoras;
+            cbHoraFin.ItemsSource = listaHoras;
 
-        private async Task InitMap()
-        {
-            try
-            {
-                string rutaAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-
-                string rutaCacheWebView2 = System.IO.Path.Combine(rutaAppData, "Secorvi", "MapaCache");
-
-
-                var environment = await CoreWebView2Environment.CreateAsync(null, rutaCacheWebView2);
-                await mapaWebView.EnsureCoreWebView2Async(environment);
-                string html = @"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset='utf-8' />
-    <link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>
-    <script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
-    <style>
-        body { margin:0; padding:0; overflow: hidden; background: #0B0D12; font-family: 'Segoe UI', sans-serif; }
-        #map { height:100vh; width: 100vw; z-index: 1; }
-        .leaflet-tile { filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) !important; }
-        #search-panel { position: absolute; top: 20px; right: 20px; z-index: 1000; width: 350px; }
-        .search-bar { position: relative; background: #1E222D; border: 2px solid #FFB300; border-radius: 12px; padding: 4px 15px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); }
-        .search-bar input { width: 100%; background: transparent; border: none; color: white; padding: 12px 0; outline: none; font-size: 15px; }
-        #suggestions-list { background: #1E222D; border: 2px solid #303645; border-radius: 12px; margin-top: 10px; max-height: 300px; overflow-y: auto; display: none; box-shadow: 0 12px 30px rgba(0,0,0,0.8); }
-        .suggestion-item { padding: 14px 16px; border-bottom: 1px solid #2A2E3B; color: #E5E7EB; cursor: pointer; font-size: 14px; transition: all 0.2s; }
-        .suggestion-item:hover, .suggestion-item.active { background: #FFB300; color: #000; }
-        .suggestion-item:last-child { border-bottom: none; }
-        .highlight { font-weight: bold; color: #FFB300; }
-        .suggestion-item:hover .highlight, .suggestion-item.active .highlight { color: #000; }
-    </style>
-</head>
-<body>
-    <div id='search-panel'>
-        <div class='search-bar'>
-            <input type='text' id='searchInput' placeholder='Buscar dirección...' autocomplete='off'>
-        </div>
-        <div id='suggestions-list'></div>
-    </div>
-    <div id='map'></div>
-    <script>
-        const map = L.map('map', { zoomControl: false }).setView([25.6844, -100.3161], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        let marker, circle, debounceTimer;
-        let activeIndex = -1;
-        const searchInput = document.getElementById('searchInput');
-        const list = document.getElementById('suggestions-list');
-
-        searchInput.oninput = (e) => {
-            clearTimeout(debounceTimer);
-            const query = e.target.value;
-            if (query.length < 3) { list.style.display = 'none'; return; }
-            debounceTimer = setTimeout(async () => {
-                try {
-                    const response = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&limit=6&countrycodes=mx');
-                    const data = await response.json();
-                    renderSuggestions(data, query);
-                } catch (err) { console.error(err); }
-            }, 300);
-        };
-
-        function renderSuggestions(data, query) {
-            list.innerHTML = '';
-            activeIndex = -1;
-            if (data.length > 0) {
-                list.style.display = 'block';
-                data.forEach((item, index) => {
-                    const div = document.createElement('div');
-                    div.className = 'suggestion-item';
-                    const regex = new RegExp('(' + query + ')', 'gi');
-                    div.innerHTML = item.display_name.replace(regex, '<span class=""highlight"">$1</span>');
-                    div.onclick = () => selectItem(item);
-                    list.appendChild(div);
-                });
-            } else { list.style.display = 'none'; }
-        }
-
-        function selectItem(item) {
-            updatePoint(parseFloat(item.lat), parseFloat(item.lon), true);
-            searchInput.value = item.display_name;
-            list.style.display = 'none';
-        }
-
-        searchInput.onkeydown = (e) => {
-            const items = list.getElementsByClassName('suggestion-item');
-            if (e.key === 'ArrowDown') {
-                activeIndex = (activeIndex + 1) % items.length;
-                updateActive(items);
-            } else if (e.key === 'ArrowUp') {
-                activeIndex = (activeIndex - 1 + items.length) % items.length;
-                updateActive(items);
-            } else if (e.key === 'Enter' && activeIndex > -1) {
-                items[activeIndex].click();
-            }
-        };
-
-        function updateActive(items) {
-            for (let i = 0; i < items.length; i++) items[i].classList.remove('active');
-            if (activeIndex > -1) items[activeIndex].classList.add('active');
-        }
-
-        function updatePoint(lat, lng, moveTo = false) {
-            if (marker) map.removeLayer(marker);
-            if (circle) map.removeLayer(circle);
-            marker = L.marker([lat, lng]).addTo(map);
-            circle = L.circle([lat, lng], { color: '#FFB300', fillColor: '#FFB300', fillOpacity: 0.2, radius: 200 }).addTo(map);
-            if (moveTo) map.setView([lat, lng], 17);
-            window.chrome.webview.postMessage({lat: lat, lng: lng});
-        }
-
-        map.on('click', (e) => { updatePoint(e.latlng.lat, e.latlng.lng, false); list.style.display = 'none'; });
-        window.updatePos = (lat, lng) => updatePoint(lat, lng, true);
-    </script>
-</body></html>";
-
-                mapaWebView.NavigateToString(html);
-                mapaWebView.WebMessageReceived += (s, e) => {
-                    try
-                    {
-                        using (var doc = JsonDocument.Parse(e.WebMessageAsJson))
-                        {
-                            _selectedLat = doc.RootElement.GetProperty("lat").GetDouble();
-                            _selectedLng = doc.RootElement.GetProperty("lng").GetDouble();
-                            txtCoords.Text = string.Format("{0:F6}, {1:F6}", _selectedLat, _selectedLng);
-                        }
-                    }
-                    catch { }
-                };
-            }
-            catch (Exception ex) { MessageBox.Show(ex.Message); }
+            cbHoraInicio.Text = "08:00";
+            cbAmPmInicio.SelectedIndex = 0;
+            cbHoraFin.Text = "04:00";
+            cbAmPmFin.SelectedIndex = 1;
         }
 
         private void RefrescarListaUbicaciones()
         {
-            lstUbicaciones.ItemsSource = null;
             lstUbicaciones.ItemsSource = DataService.Ubicaciones.OrderBy(u => u.nombre_lugar).ToList();
+        }
+
+        // --- APARTADO DE MAPA (ESTRICTAMENTE IGUAL A TU CÓDIGO) ---
+        private async Task InitMap()
+        {
+            string cache = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Secorvi", "EBWebView");
+            var env = await CoreWebView2Environment.CreateAsync(null, cache);
+            await mapaWebView.EnsureCoreWebView2Async(env);
+
+            string html = @"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'/>
+    <link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>
+    <link rel='stylesheet' href='https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css' />
+    <script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
+    <script src='https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js'></script>
+    <style>
+        body { margin:0; background:#0B0D12; } 
+        #map { height:100vh; width:100vw; } 
+        .leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        
+        .leaflet-control-geocoder { 
+            background: white !important; 
+            border: 1px solid #ccc !important; 
+            border-radius: 4px !important;
+            width: 34px; height: 34px;
+            transition: width 0.2s ease;
+        }
+        .leaflet-control-geocoder-icon { 
+            width: 34px !important; height: 34px !important; 
+            background-size: 18px 18px !important; 
+        }
+        .leaflet-control-geocoder-expanded { 
+            width: 300px !important; height: 34px !important; 
+        }
+        .leaflet-control-geocoder-form input { 
+            font-size: 14px !important;
+            color: #000 !important;
+            background: white !important; 
+            height: 30px !important;
+            border: none !important;
+            padding-left: 8px !important;
+        }
+
+        .leaflet-control-geocoder-alternatives {
+            background: white !important;
+            color: black !important;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
+            border: 1px solid #ccc !important;
+            border-radius: 0 0 4px 4px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            max-width: 300px;
+        }
+        .leaflet-control-geocoder-alternatives li {
+            border-bottom: 1px solid #eee;
+            padding: 8px 12px !important;
+        }
+        .leaflet-control-geocoder-alternatives li:hover {
+            background: #f0f0f0 !important;
+            color: #0078A8 !important;
+        }
+    </style>
+</head>
+<body>
+    <div id='map'></div>
+    <script>
+        const map = L.map('map', { zoomControl: false }).setView([25.68, -100.31], 12); 
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+        
+        let marker;
+        let circle; 
+
+        function updatePoint(lat, lng, name, move){ 
+            if(marker) map.removeLayer(marker); 
+            if(circle) map.removeLayer(circle);
+
+            marker = L.marker([lat, lng]).addTo(map); 
+
+            circle = L.circle([lat, lng], {
+                color: '#00F5FF',      
+                fillColor: '#00F5FF',  
+                fillOpacity: 0.2,      
+                radius: 200            
+            }).addTo(map);
+
+            if(move) map.setView([lat, lng], 16); 
+            window.chrome.webview.postMessage({lat:lat, lng:lng, name: name || ''}); 
+        }
+
+        const geocoder = L.Control.geocoder({
+            defaultMarkGeocode: false,
+            placeholder: 'Buscar dirección...',
+            position: 'topright'
+        })
+        .on('markgeocode', function(e) {
+            var center = e.geocode.center;
+            updatePoint(center.lat, center.lng, e.geocode.name, true);
+        })
+        .addTo(map);
+
+        map.on('click', (e) => updatePoint(e.latlng.lat, e.latlng.lng, '', false)); 
+        window.updatePos = (lat, lng) => updatePoint(lat, lng, '', true);
+    </script>
+</body>
+</html>";
+
+            mapaWebView.NavigateToString(html);
+            mapaWebView.WebMessageReceived += (s, e) => {
+                using var doc = JsonDocument.Parse(e.WebMessageAsJson);
+                _selectedLat = doc.RootElement.GetProperty("lat").GetDouble();
+                _selectedLng = doc.RootElement.GetProperty("lng").GetDouble();
+
+                _idUbicacionSeleccionada = 0;
+
+                if (doc.RootElement.TryGetProperty("name", out var nameProp))
+                {
+                    string name = nameProp.GetString();
+                    if (!string.IsNullOrEmpty(name)) txtNombrePunto.Text = name.ToUpper();
+                }
+
+                txtCoords.Text = string.Format(CultureInfo.InvariantCulture, "{0:F6}, {1:F6}", _selectedLat, _selectedLng);
+            };
         }
 
         private void lstUbicaciones_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -207,15 +184,80 @@ namespace Secorvi
             if (lstUbicaciones.SelectedItem is Ubicacion u)
             {
                 txtNombrePunto.Text = u.nombre_lugar;
+                _idUbicacionSeleccionada = u.id_ubicacion; // Guardamos el ID real de la base de datos
                 _selectedLat = (double)u.latitud;
                 _selectedLng = (double)u.longitud;
-
-                // Usamos CultureInfo.InvariantCulture para asegurar que el punto decimal sea '.' y no ','
                 txtCoords.Text = string.Format(CultureInfo.InvariantCulture, "{0:F6}, {1:F6}", _selectedLat, _selectedLng);
-
-                mapaWebView.ExecuteScriptAsync(string.Format(CultureInfo.InvariantCulture,
-                    "window.updatePos({0}, {1})", _selectedLat, _selectedLng));
+                mapaWebView.ExecuteScriptAsync($"window.updatePos({_selectedLat.ToString(CultureInfo.InvariantCulture)}, {_selectedLng.ToString(CultureInfo.InvariantCulture)})");
             }
+        }
+
+        // --- LÓGICA DE ASIGNACIÓN CORREGIDA ---
+
+        private void BtnGuardar_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // CAMBIO DE LÓGICA: Permitir guardar si hay ID o si hay coordenadas marcadas
+                if (_idUbicacionSeleccionada == 0 && (_selectedLat == 0 || _selectedLng == 0))
+                {
+                    MessageBox.Show("Por favor, selecciona una ubicación de la lista o marca un punto en el mapa.", "Aviso");
+                    return;
+                }
+
+                TimeSpan inicio = GetTimeSpanFromPickers(cbHoraInicio, cbAmPmInicio);
+                TimeSpan fin = GetTimeSpanFromPickers(cbHoraFin, cbAmPmFin);
+                string descripcion = txtNombrePunto.Text.Trim();
+
+                foreach (var fecha in _fechasDestino)
+                {
+                    DataService.EliminarAsignacionPorFecha(_idEmpleado, fecha);
+
+                    var nuevaAsig = new Asignacion
+                    {
+                        id_empleado = _idEmpleado,
+                        // Si seleccionó de la lista usa ese ID, si no, usa 1 (Genérico)
+                        id_ubicacion = _idUbicacionSeleccionada == 0 ? 1 : _idUbicacionSeleccionada,
+                        fecha = fecha,
+                        hora_inicio = inicio,
+                        hora_fin = fin,
+                        descripcion_del_turno = string.IsNullOrEmpty(descripcion) ? "TURNO" : descripcion,
+                        estatus = "ASIGNADO"
+                    };
+
+                    DataService.CrearAsignacion(nuevaAsig);
+                }
+
+                MessageBox.Show($"¡Éxito! Se han asignado {_fechasDestino.Count} días correctamente.", "Secorvi System");
+                this.NavigationService?.GoBack();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al masificar la asignación: " + ex.Message, "Error");
+            }
+        }
+        private TimeSpan GetTimeSpanFromPickers(ComboBox cbHora, ComboBox cbAmPm)
+        {
+            if (string.IsNullOrEmpty(cbHora.Text)) return TimeSpan.Zero;
+            string[] partes = cbHora.Text.Split(':');
+            int horas = int.Parse(partes[0]);
+            int minutos = int.Parse(partes[1]);
+            string amPm = (cbAmPm.SelectedItem as ComboBoxItem)?.Content.ToString();
+
+            if (amPm == "PM" && horas < 12) horas += 12;
+            if (amPm == "AM" && horas == 12) horas = 0;
+
+            return new TimeSpan(horas, minutos, 0);
+        }
+
+        private void SetPickersFromTimeSpan(TimeSpan ts, ComboBox cbHora, ComboBox cbAmPm)
+        {
+            int h = ts.Hours;
+            string amPm = "AM";
+            if (h >= 12) { amPm = "PM"; if (h > 12) h -= 12; }
+            if (h == 0) h = 12;
+            cbHora.Text = $"{h:D2}:{ts.Minutes:D2}";
+            cbAmPm.SelectedIndex = (amPm == "PM") ? 1 : 0;
         }
 
         private void BtnTurno8_Click(object sender, RoutedEventArgs e) => AplicarPreajuste(8);
@@ -223,159 +265,20 @@ namespace Secorvi
         private void BtnTurno24_Click(object sender, RoutedEventArgs e)
         {
             cbHoraInicio.Text = "12:00";
-            cbAmPmI.SelectedIndex = 0; 
+            cbAmPmInicio.SelectedIndex = 0;
             cbHoraFin.Text = "12:00";
-            cbAmPmF.SelectedIndex = 0;
+            cbAmPmFin.SelectedIndex = 0;
+            txtNombrePunto.Text = "24 HORAS";
         }
-        private void AplicarPreajuste(int horas)
+
+        private void AplicarPreajuste(int h)
         {
-            try
-            {
-                string horaStr = cbHoraInicio.Text.Trim();
-                string amPm = (cbAmPmI.SelectedItem as ComboBoxItem).Content.ToString();
-
-                // Parseamos la entrada
-                DateTime entrada = DateTime.ParseExact($"{horaStr} {amPm}",
-                    new[] { "h:mm tt", "hh:mm tt" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
-
-                // Sumamos las horas (8, 12 o 24)
-                DateTime salida = entrada.AddHours(horas);
-
-                // Asignamos el texto (Formato 12h)
-                cbHoraFin.Text = salida.ToString("hh:mm");
-
-                // Seleccionamos AM (index 0) o PM (index 1) basado en el resultado
-                cbAmPmF.SelectedIndex = salida.ToString("tt", CultureInfo.InvariantCulture).ToUpper().Contains("AM") ? 0 : 1;
-            }
-            catch
-            {
-                MessageBox.Show("Formato de entrada inválido en Inicio. Use HH:MM (Ej: 07:00)");
-            }
-        }
-        private void BtnGuardar_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedLat == 0 || string.IsNullOrWhiteSpace(cbHoraInicio.Text) || string.IsNullOrWhiteSpace(txtNombrePunto.Text))
-            {
-                MessageBox.Show("Por favor, complete el nombre del lugar y seleccione un punto en el mapa.");
-                return;
-            }
-
-            try
-            {
-                string entradaFinal = $"{cbHoraInicio.Text.Trim()} {(cbAmPmI.SelectedItem as ComboBoxItem).Content}";
-                string salidaFinal = $"{cbHoraFin.Text.Trim()} {(cbAmPmF.SelectedItem as ComboBoxItem).Content}";
-                string[] formatos = { "h:mm tt", "hh:mm tt" };
-                DateTime dtI = DateTime.ParseExact(entradaFinal, formatos, CultureInfo.InvariantCulture, DateTimeStyles.None);
-                DateTime dtF = DateTime.ParseExact(salidaFinal, formatos, CultureInfo.InvariantCulture, DateTimeStyles.None);
-                string nombrePunto = txtNombrePunto.Text.Trim().ToUpper();
-                Ubicacion ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == nombrePunto);
-
-                if (ubi == null)
-                {
-                    ubi = new Ubicacion
-                    {
-                        nombre_lugar = nombrePunto,
-                        latitud = (decimal)_selectedLat,
-                        longitud = (decimal)_selectedLng,
-                        radio_permitido = 200
-                    };
-                    DataService.AgregarUbicacion(ubi);
-                }
-                else
-                {
-                    ubi.latitud = (decimal)_selectedLat;
-                    ubi.longitud = (decimal)_selectedLng;
-                    DataService.ActualizarUbicacion(ubi);
-                }
-
-                DataService.CargarUbicaciones();
-                ubi = DataService.Ubicaciones.FirstOrDefault(u => u.nombre_lugar == nombrePunto);
-                DateTime fechaDestino = dpFecha.SelectedDate ?? DateTime.Today;
-
-                if (ubi == null || ubi.id_ubicacion <= 0)
-                    throw new Exception("Error crítico: No se pudo recuperar el ID de la ubicación.");
-
-                var nuevaAsignacion = new Asignacion
-                {
-                    id_empleado = _idEmpleadoPreseleccionado,
-                    id_ubicacion = ubi.id_ubicacion,
-                    descripcion_del_turno = nombrePunto.Length > 16 ? nombrePunto.Substring(0, 16) : nombrePunto,
-                    fecha = fechaDestino,
-                    hora_inicio = dtI.TimeOfDay,
-                    hora_fin = dtF.TimeOfDay,
-                    estatus = "PROGRAMADO"
-                };
-
-                DataService.CrearAsignacion(nuevaAsignacion);
-
-                MessageBox.Show("Asignación registrada exitosamente.");
-                this.DialogResult = true;
-                this.Close();
-            }
-            catch (FormatException)
-            {
-                MessageBox.Show("Error de formato: Asegúrese de escribir la hora como HH:MM (Ejemplo: 08:30)");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error al guardar: " + ex.Message);
-            }
+            TimeSpan inicio = GetTimeSpanFromPickers(cbHoraInicio, cbAmPmInicio);
+            TimeSpan fin = inicio.Add(TimeSpan.FromHours(h));
+            if (fin.Days >= 1) fin = fin.Subtract(TimeSpan.FromDays(1));
+            SetPickersFromTimeSpan(fin, cbHoraFin, cbAmPmFin);
         }
 
-
-        private void BtnEliminarVarios_Click(object sender, RoutedEventArgs e)
-        {
-            var items = lstUbicaciones.SelectedItems.Cast<Ubicacion>().ToList();
-            if (items.Count == 0) return;
-
-            var confirm = MessageBox.Show(string.Format("¿Desea eliminar {0} ubicaciones?", items.Count), "CONFIRMAR", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (confirm == MessageBoxResult.Yes)
-            {
-                try
-                {
-                    DataService.EliminarUbicaciones(items);
-                    RefrescarListaUbicaciones();
-                }
-                catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
-            }
-        }
-        // --- CONTROLES DE LA VENTANA PERSONALIZADA ---
-
-        // Permite arrastrar la ventana manteniendo presionado el clic izquierdo en la barra superior
-        private void BarraTitulo_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left)
-            {
-                this.DragMove();
-            }
-        }
-
-        // Minimiza la ventana a la barra de tareas
-        private void BtnMinimizar_Click(object sender, RoutedEventArgs e)
-        {
-            this.WindowState = WindowState.Minimized;
-        }
-
-        // Alterna entre pantalla completa y tamaño normal
-        private void BtnMaximizar_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == WindowState.Normal)
-            {
-                this.WindowState = WindowState.Maximized;
-            }
-            else
-            {
-                this.WindowState = WindowState.Normal;
-            }
-        }
-
-
-        private void BtnCerrar_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
-        }
-
-        private void BtnCancelarSeleccion_Click(object sender, RoutedEventArgs e) => lstUbicaciones.UnselectAll();
-        private void BtnCancelar_Click(object sender, RoutedEventArgs e) => this.Close();
+        private void BtnCancelar_Click(object sender, RoutedEventArgs e) => this.NavigationService?.GoBack();
     }
 }
