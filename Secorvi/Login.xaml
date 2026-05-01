@@ -1,7 +1,7 @@
 ﻿<Window x:Class="Secorvi.Login"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SECORVI - Access Terminal" Height="460" Width="360"
+        Title="SECORVI - Access Terminal" Height="372" Width="360"
         Background="Transparent" WindowStartupLocation="CenterScreen"
         WindowStyle="None" AllowsTransparency="True"
         MouseDown="Window_MouseDown">
@@ -45,7 +45,7 @@
         </Style>
     </Window.Resources>
 
-    <Border BorderBrush="#30363D" BorderThickness="1" CornerRadius="2" Background="#0B0D12">
+    <Border BorderBrush="#30363D" BorderThickness="1" CornerRadius="2" Background="#0B0D12" Margin="0,0,0,10">
         <Grid Margin="30,25">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -60,10 +60,10 @@
             </StackPanel>
 
             <StackPanel Grid.Row="1">
-                <TextBlock Text="[ OPERATOR_ID ]" Foreground="#4B5563" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
+                <TextBlock Text="Nombre de usuario" Foreground="#4B5563" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
                 <TextBox x:Name="txtUser" Style="{StaticResource TerminalEntryStyle}" CaretBrush="#FFB300" Margin="0,0,0,20"/>
 
-                <TextBlock Text="[ ACCESS_CODE ]" Foreground="#4B5563" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
+                <TextBlock Text="Contrasena" Foreground="#4B5563" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
                 <PasswordBox x:Name="txtPass" Style="{StaticResource TerminalEntryStyle}" Foreground="#FFB300" CaretBrush="#00F5FF" Margin="0,0,0,10"/>
             </StackPanel>
 

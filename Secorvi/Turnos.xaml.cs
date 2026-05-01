@@ -140,8 +140,15 @@ namespace Secorvi
                         Domingo = GetTurnoTexto(g.ToList(), DayOfWeek.Sunday)
                     };
 
-                    int total = g.Count(t => {
-                        string estado = GetTurnoTexto(new List<Asignacion> { t }, t.fecha.DayOfWeek);
+                    // PEGA ESTO:
+                    var diasSemana = new[] {
+                        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+                        DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+                    };
+
+                    int total = diasSemana.Count(dia => {
+                        // Usamos la misma lógica visual para contar: un turno por día máximo
+                        string estado = GetTurnoTexto(g.ToList(), dia);
                         return estado != "DESCANSO" && estado != "VACACIONES" && estado != "-";
                     });
 
