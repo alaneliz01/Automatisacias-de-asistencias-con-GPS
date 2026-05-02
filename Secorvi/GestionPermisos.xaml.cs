@@ -1,11 +1,11 @@
 ﻿using Secorvi.Models;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel; // Para ICollectionView
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;   // Para CollectionViewSource
+using System.Windows.Data;
 
 namespace Secorvi
 {
@@ -16,7 +16,7 @@ namespace Secorvi
         public string NuevaContrasena { get; private set; }
 
         private Empleado _emp;
-        private ICollectionView _empleadosView; // El motor de búsqueda
+        private ICollectionView _empleadosView;
 
         public GestionPermisos()
         {
@@ -29,7 +29,6 @@ namespace Secorvi
         {
             var listaEmpleados = DataService.Empleados.OrderBy(e => e.nombre_completo).ToList();
 
-            // Configuramos la vista y el filtro (igual que en el PanelDeControl)
             _empleadosView = CollectionViewSource.GetDefaultView(listaEmpleados);
             _empleadosView.Filter = (obj) =>
             {
@@ -49,29 +48,24 @@ namespace Secorvi
             lstEmpleadosResultados.ItemsSource = _empleadosView;
         }
 
-        // EVENTO 1: Cuando escribes en la caja, se filtra la lista automáticamente
         private void TxtBuscadorEmpleado_TextChanged(object sender, TextChangedEventArgs e)
         {
             _empleadosView?.Refresh();
 
-            // LÓGICA DE UX: Solo mostramos la lista si hay texto escrito
             bool hayBusqueda = !string.IsNullOrWhiteSpace(txtBuscadorEmpleado.Text);
 
             lstEmpleadosResultados.Visibility = hayBusqueda ? Visibility.Visible : Visibility.Collapsed;
 
-            // Si la lista está dentro de un borde en el XAML, también lo ocultamos para que no quede una raya flotando
             if (lstEmpleadosResultados.Parent is Border borde)
             {
                 borde.Visibility = hayBusqueda ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            // Ocultar configuración hasta que seleccione alguien de los resultados
             panelConfiguracion.Visibility = Visibility.Collapsed;
             btnGuardar.IsEnabled = false;
             lblNombreEmpleado.Text = "SELECCIONE UN AGENTE...";
         }
 
-        // EVENTO 2: Cuando das clic a alguien en la lista
         private void LstEmpleadosResultados_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (lstEmpleadosResultados.SelectedItem is Empleado seleccionado)
@@ -79,30 +73,23 @@ namespace Secorvi
                 _emp = seleccionado;
                 IdEmpleadoSeleccionado = _emp.id_empleado;
 
-                // Actualizamos la etiqueta de la interfaz
                 lblNombreEmpleado.Text = _emp.nombre_completo.ToUpper();
 
-                // Revelamos el panel y habilitamos el botón de guardar
                 panelConfiguracion.Visibility = Visibility.Visible;
                 btnGuardar.IsEnabled = true;
 
-                // Forzamos a que el combo de roles seleccione el actual
                 cbRoles.SelectedValue = _emp.id_rol;
 
-                // Limpiamos
                 txtNuevaPassUsuario.Clear();
                 txtNuevaPassUsuarioVisible.Clear();
                 CancelarModoAutorizacion();
 
-                // LÓGICA DE UX: Ocultar la lista de resultados para limpiar la pantalla
                 lstEmpleadosResultados.Visibility = Visibility.Collapsed;
                 if (lstEmpleadosResultados.Parent is Border borde)
                 {
                     borde.Visibility = Visibility.Collapsed;
                 }
 
-                // Autocompletamos la caja de texto con el nombre seleccionado para que se vea elegante.
-                // Desconectamos el evento temporalmente para que no vuelva a abrir la lista al cambiar el texto.
                 txtBuscadorEmpleado.TextChanged -= TxtBuscadorEmpleado_TextChanged;
                 txtBuscadorEmpleado.Text = _emp.nombre_completo;
                 txtBuscadorEmpleado.TextChanged += TxtBuscadorEmpleado_TextChanged;
@@ -124,6 +111,14 @@ namespace Secorvi
         {
             if (cbRoles.SelectedItem is RolManual selected && _emp != null)
             {
+                // NUEVO: Candado de seguridad UX para evitar degradar al Super Admin
+                if (_emp.id_rol == 1 && selected.Id > 1)
+                {
+                    MessageBox.Show("PROTOCOLO DE SEGURIDAD: No está permitido degradar el rango de un SUPER ADMIN desde esta interfaz.", "OPERACIÓN DENEGADA", MessageBoxButton.OK, MessageBoxImage.Stop);
+                    cbRoles.SelectedValue = 1; // Revertimos el control de la interfaz de inmediato
+                    return;
+                }
+
                 txtDescripcionRol.Text = selected.Desc;
                 IdRolSeleccionado = selected.Id;
 
@@ -224,35 +219,35 @@ namespace Secorvi
 
         private void BtnGuardar_Click(object sender, RoutedEventArgs e)
         {
-            // 1. Verificación básica: ¿Hay un empleado y un rol seleccionados?
             if (_emp == null || cbRoles.SelectedItem == null) return;
 
-            // 2. Extraemos el Rol deseado de la propiedad que se actualiza en el SelectionChanged
             int rolDeseado = IdRolSeleccionado;
 
-            // Obtenemos la clave de texto o de passwordbox dependiendo de cuál esté visible
+            // NUEVO: Candado lógico de backend por si el sistema llega a fallar en la interfaz
+            if (_emp.id_rol == 1 && rolDeseado > 1)
+            {
+                MessageBox.Show("ERROR CRÍTICO: Imposible degradar cuenta de nivel 1. Operación abortada.", "SEGURIDAD DE NÚCLEO", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
             string claveUsuario = txtNuevaPassUsuario.Visibility == Visibility.Visible
                                   ? txtNuevaPassUsuario.Password
                                   : txtNuevaPassUsuarioVisible.Text;
 
-            // 3. PROTOCOLO DE SEGURIDAD PARA ADMINISTRADOR (1) Y SUPERVISOR (2)
             if (rolDeseado == 1 || rolDeseado == 2)
             {
-                // Validamos que el usuario tenga una clave (obligatorio para estos niveles)
                 if (string.IsNullOrWhiteSpace(claveUsuario))
                 {
                     MessageBox.Show("DEBE ASIGNAR O CONFIRMAR UNA CONTRASEÑA PARA EL USUARIO.", "DATOS INCOMPLETOS", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                // Validamos que el responsable haya firmado abajo en la sección de autorizador
                 if (string.IsNullOrWhiteSpace(txtUserAuth.Text) || string.IsNullOrWhiteSpace(txtPassAuth.Password))
                 {
                     MessageBox.Show("DEBE INGRESAR SU USUARIO Y CONTRASEÑA EN LA SECCIÓN DE FIRMA PARA AUTORIZAR ESTE CAMBIO.", "FALTA FIRMA", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
-                // Ejecutamos la validación técnica de las credenciales del autorizador
                 bool validado = ValidarCredencialesSeguridad(txtUserAuth.Text, txtPassAuth.Password, rolDeseado);
 
                 if (!validado)
@@ -263,17 +258,14 @@ namespace Secorvi
                 }
             }
 
-            // 4. PREPARACIÓN DE RESULTADOS PARA EL PANEL DE CONTROL
-            // Si el rol es 3 (Agente), la contraseña viaja como NULL.
-            // IMPORTANTE: Recuerda aplicar el cambio en MySQL (ALTER TABLE empleados MODIFY contrasena varchar(100) NULL;)
             IdRolSeleccionado = rolDeseado;
             NuevaContrasena = (rolDeseado == 3) ? null : claveUsuario;
 
             MessageBox.Show("CAMBIOS APLICADOS CORRECTAMENTE.", "SECORVI SECURITY", MessageBoxButton.OK, MessageBoxImage.Information);
 
-            // Cerramos la ventana devolviendo 'true' para que el Panel de Control refresque la tabla
             this.DialogResult = true;
         }
+
         private bool ValidarCredencialesSeguridad(string user, string pass, int rolDeseado)
         {
             var authEmpleado = DataService.Empleados.FirstOrDefault(e => e.usuario == user && e.contrasena == pass);

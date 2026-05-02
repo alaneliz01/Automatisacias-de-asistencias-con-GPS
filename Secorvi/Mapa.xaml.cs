@@ -28,7 +28,54 @@ namespace Secorvi
             RefrescarListaUbicaciones();
             _ = InitMap();
 
-            // lblInfoAsignacion eliminado para evitar errores ya que no existe en tu XAML
+            // 1. CONFIGURAR EL CLICK DERECHO PARA LA LISTA DE UBICACIONES
+            ConfigurarMenuContextualUbicaciones();
+        }
+
+        private void ConfigurarMenuContextualUbicaciones()
+        {
+            var menuContextual = new ContextMenu();
+            var menuEliminar = new MenuItem { Header = "Eliminar Ubicación" };
+            menuEliminar.Click += MenuEliminar_Click;
+            menuContextual.Items.Add(menuEliminar);
+
+            lstUbicaciones.ContextMenu = menuContextual;
+        }
+
+        private void MenuEliminar_Click(object sender, RoutedEventArgs e)
+        {
+            if (lstUbicaciones.SelectedItem is Ubicacion u)
+            {
+                var resultado = MessageBox.Show($"¿Estás seguro de que deseas eliminar la ubicación '{u.nombre_lugar}'?",
+                                                "Confirmar Eliminación",
+                                                MessageBoxButton.YesNo,
+                                                MessageBoxImage.Warning);
+
+                if (resultado == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        // IMPORTANTE: Debes crear este método en tu clase DataService
+                        // Que ejecute el DELETE FROM Ubicaciones WHERE id = u.id_ubicacion
+                        DataService.EliminarUbicacion(u.id_ubicacion);
+
+                        MessageBox.Show("Ubicación eliminada correctamente.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                        // Limpiamos selección si es la que estaba activa
+                        if (_idUbicacionSeleccionada == u.id_ubicacion)
+                        {
+                            _idUbicacionSeleccionada = 0;
+                            txtNombrePunto.Text = "";
+                        }
+
+                        RefrescarListaUbicaciones();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Error al eliminar la ubicación: " + ex.Message, "Error");
+                    }
+                }
+            }
         }
 
         private void ConfigurarDropdownsHoras()
@@ -53,7 +100,7 @@ namespace Secorvi
             lstUbicaciones.ItemsSource = DataService.Ubicaciones.OrderBy(u => u.nombre_lugar).ToList();
         }
 
-        // --- APARTADO DE MAPA (ESTRICTAMENTE IGUAL A TU CÓDIGO) ---
+        // --- APARTADO DE MAPA ---
         private async Task InitMap()
         {
             string cache = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Secorvi", "EBWebView");
@@ -167,6 +214,7 @@ namespace Secorvi
                 _selectedLat = doc.RootElement.GetProperty("lat").GetDouble();
                 _selectedLng = doc.RootElement.GetProperty("lng").GetDouble();
 
+                // Al tocar el mapa, reiniciamos el ID para saber que es un punto nuevo
                 _idUbicacionSeleccionada = 0;
 
                 if (doc.RootElement.TryGetProperty("name", out var nameProp))
@@ -192,22 +240,39 @@ namespace Secorvi
             }
         }
 
-        // --- LÓGICA DE ASIGNACIÓN CORREGIDA ---
+        // --- LÓGICA DE ASIGNACIÓN ---
 
         private void BtnGuardar_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // CAMBIO DE LÓGICA: Permitir guardar si hay ID o si hay coordenadas marcadas
                 if (_idUbicacionSeleccionada == 0 && (_selectedLat == 0 || _selectedLng == 0))
                 {
                     MessageBox.Show("Por favor, selecciona una ubicación de la lista o marca un punto en el mapa.", "Aviso");
                     return;
                 }
 
+                string descripcion = txtNombrePunto.Text.Trim();
+
+                // 2. LÓGICA PARA GUARDAR LA NUEVA UBICACIÓN
+                if (_idUbicacionSeleccionada == 0 && _selectedLat != 0 && _selectedLng != 0)
+                {
+                    var nuevaUbicacion = new Ubicacion
+                    {
+                        nombre_lugar = string.IsNullOrEmpty(descripcion) ? "NUEVO PUNTO MAPA" : descripcion,
+                        // Convierte a decimal si en tu modelo 'Ubicacion' está como decimal. Si está como double, quita el cast.
+                        latitud = (decimal)_selectedLat,
+                        longitud = (decimal)_selectedLng
+                    };
+
+                    _idUbicacionSeleccionada = DataService.CrearUbicacionRetornandoId(nuevaUbicacion);
+
+                    // Refrescamos para que ya salga en la lista para la próxima
+                    RefrescarListaUbicaciones();
+                }
+
                 TimeSpan inicio = GetTimeSpanFromPickers(cbHoraInicio, cbAmPmInicio);
                 TimeSpan fin = GetTimeSpanFromPickers(cbHoraFin, cbAmPmFin);
-                string descripcion = txtNombrePunto.Text.Trim();
 
                 foreach (var fecha in _fechasDestino)
                 {
@@ -216,8 +281,7 @@ namespace Secorvi
                     var nuevaAsig = new Asignacion
                     {
                         id_empleado = _idEmpleado,
-                        // Si seleccionó de la lista usa ese ID, si no, usa 1 (Genérico)
-                        id_ubicacion = _idUbicacionSeleccionada == 0 ? 1 : _idUbicacionSeleccionada,
+                        id_ubicacion = _idUbicacionSeleccionada, // Ahora siempre tendrá un ID válido
                         fecha = fecha,
                         hora_inicio = inicio,
                         hora_fin = fin,
@@ -236,6 +300,7 @@ namespace Secorvi
                 MessageBox.Show("Error al masificar la asignación: " + ex.Message, "Error");
             }
         }
+
         private TimeSpan GetTimeSpanFromPickers(ComboBox cbHora, ComboBox cbAmPm)
         {
             if (string.IsNullOrEmpty(cbHora.Text)) return TimeSpan.Zero;

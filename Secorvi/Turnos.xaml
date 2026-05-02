@@ -32,46 +32,82 @@
             </Setter>
         </Style>
 
+        <!-- ESTILO ACTUALIZADO: FONDO OSCURO Y TEXTO BLANCO -->
         <Style x:Key="DarkComboBox" TargetType="ComboBox">
             <Setter Property="Background" Value="#1A1F26"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderGray}"/>
+            <Setter Property="BorderBrush" Value="#2D323E"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="5,2"/>
+            <Setter Property="Padding" Value="10,0,30,0"/>
             <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItem}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
                         <Grid>
-                            <ToggleButton x:Name="ToggleButton" BorderBrush="{TemplateBinding BorderBrush}" 
-                                          BorderThickness="{TemplateBinding BorderThickness}" 
-                                          Background="{TemplateBinding Background}" Grid.ColumnSpan="2" Focusable="false"
-                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press">
+                            <!-- 1. Fondo principal y Botón desplegable -->
+                            <ToggleButton x:Name="ToggleButton"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          Background="{TemplateBinding Background}"
+                                          Grid.Column="2"
+                                          Focusable="false"
+                                          IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          ClickMode="Press">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
-                                        <Border x:Name="Border" CornerRadius="4" Background="{TemplateBinding Background}" 
-                                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
-                                            <Path x:Name="Arrow" Fill="White" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" Data="M0,0 L4,4 L8,0 Z"/>
+                                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="4">
+                                            <Path x:Name="Arrow" Fill="{StaticResource TextMuted}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" Data="M0,0 L4,4 L8,0 Z"/>
                                         </Border>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                             </ToggleButton>
 
-                            <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False" 
-                                              Content="{TemplateBinding SelectionBoxItem}" 
-                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" 
-                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" 
-                                              Margin="8,3,23,3" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                            <!-- 2. Contenedor del texto seleccionado (Para ComboBox NO editables) -->
+                            <ContentPresenter x:Name="ContentSite"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                              Margin="10,0,30,0"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left" />
 
-                            <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
-                                <Grid x:Name="DropDown" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder" Background="#1A1F26" BorderBrush="{StaticResource BorderGray}" BorderThickness="1" CornerRadius="0,0,4,4"/>
-                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
+                            <!-- 3. Contenedor del texto (Para ComboBox EDITABLES, ej. Buscar Empleado) -->
+                            <TextBox x:Name="PART_EditableTextBox"
+                                     HorizontalAlignment="Stretch"
+                                     VerticalAlignment="Center"
+                                     Margin="10,0,30,0"
+                                     Focusable="True"
+                                     Background="Transparent"
+                                     Foreground="White"
+                                     CaretBrush="White"
+                                     BorderThickness="0"
+                                     Visibility="Hidden"
+                                     IsReadOnly="{TemplateBinding IsReadOnly}"/>
+
+                            <!-- 4. Menú desplegable (Popup) -->
+                            <Popup x:Name="Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Grid x:Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder" Background="#1A1F26" BorderThickness="1" BorderBrush="#2D323E" CornerRadius="4"/>
+                                    <ScrollViewer Margin="1" SnapsToDevicePixels="True">
                                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
                                     </ScrollViewer>
                                 </Grid>
                             </Popup>
                         </Grid>
+
+                        <!-- Triggers para alternar entre modo editable y normal -->
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEditable" Value="true">
+                                <Setter Property="IsTabStop" Value="false"/>
+                                <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible"/>
+                                <Setter TargetName="ContentSite" Property="Visibility" Value="Hidden"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -120,6 +156,13 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="MultilineElementStyle" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
     </Page.Resources>
 
     <Grid Margin="15">
@@ -129,16 +172,43 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- HEADER -->
         <Border Grid.Row="0" Style="{StaticResource StatCard}" Padding="12" Margin="0,0,0,15">
             <DockPanel>
-                <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center">
+
+                <!-- CONTROLES DERECHOS: BUSCADOR INTELIGENTE Y EXPORTAR -->
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+
+                    <!-- NAVEGADOR INTELIGENTE (Filtro en vivo) -->
+                    <Border Background="#0F111A" BorderBrush="{StaticResource BorderGray}" BorderThickness="1" CornerRadius="4" Width="260" Height="32" Margin="0,0,15,0">
+                        <Grid>
+                            <!-- Texto fantasma (Placeholder) -->
+                            <TextBlock Text="🔍 Filtrar empleado en pantalla..." Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,0,0" IsHitTestVisible="False" FontSize="11">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Hidden"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text.Length, ElementName=TxtBusqueda}" Value="0">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <!-- TextBox real -->
+                            <TextBox x:Name="TxtBusqueda" Background="Transparent" Foreground="White" BorderThickness="0" VerticalAlignment="Center" Margin="5,0,5,0" CaretBrush="White" TextChanged="TxtBusqueda_TextChanged"/>
+                        </Grid>
+                    </Border>
+
                     <Button x:Name="btnExportExcel" Content="📊 EXPORTAR EXCEL" Click="BtnExportExcel_Click" 
                             Background="{StaticResource PrimaryYellow}" Foreground="Black" FontWeight="Bold" Padding="15,8" BorderThickness="0" Width="146" Height="32" />
                 </StackPanel>
+
                 <StackPanel Orientation="Horizontal">
                     <Button Content="◀ VOLVER" Click="BtnVolver_Click" Style="{StaticResource BackButtonStyle}" FontWeight="Bold" FontSize="10" Margin="0,0,15,0"/>
                     <StackPanel>
-                        <TextBlock Text="MONITOREO DE ASISTENCIA" Foreground="{StaticResource PrimaryYellow}" FontSize="20" FontWeight="Bold"/>
+                        <TextBlock Text="MONITOREO Y ASIGNACIONES" Foreground="{StaticResource PrimaryYellow}" FontSize="20" FontWeight="Bold"/>
                         <TextBlock x:Name="lblReloj" Text="00:00:00 PM" Foreground="{StaticResource TextMuted}" FontSize="12"/>
                     </StackPanel>
                 </StackPanel>
@@ -151,96 +221,154 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
+            <!-- FILTROS -->
             <Border Grid.Row="0" Style="{StaticResource StatCard}" Margin="0,0,0,12" Background="#0F111A">
                 <StackPanel Orientation="Horizontal">
-                    <StackPanel Margin="0,0,25,0">
-                        <TextBlock Text="FILTRAR EMPLEADO" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
+
+                    <!-- BUSCAR EMPLEADO -->
+                    <StackPanel Margin="0,0,20,0">
+                        <TextBlock Text="BUSCAR EMPLEADO" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
                         <ComboBox x:Name="cbEmpleados" Style="{StaticResource DarkComboBox}" Width="250" Height="32" 
-                                  DisplayMemberPath="nombre_completo" SelectedValuePath="id_empleado" SelectionChanged="CbEmpleados_SelectionChanged"/>
+                                  DisplayMemberPath="nombre_completo" SelectedValuePath="id_empleado" SelectionChanged="CbEmpleados_SelectionChanged"
+                                  IsEditable="True" IsReadOnly="False" TextSearch.TextPath="nombre_completo" StaysOpenOnEdit="True"/>
                     </StackPanel>
+
+                    <!-- VISTA -->
+                    <StackPanel Margin="0,0,20,0">
+                        <TextBlock Text="VISTA" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
+                        <ComboBox x:Name="cbTipoPeriodo" Style="{StaticResource DarkComboBox}" Width="110" Height="32" SelectionChanged="CbTipoPeriodo_SelectionChanged">
+                            <ComboBoxItem Content="HOY" />
+                            <ComboBoxItem Content="SEMANAL" IsSelected="True" />
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- IR A... -->
+                    <StackPanel Margin="0,0,20,0">
+                        <TextBlock Text="IR A..." Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
+                        <ComboBox x:Name="cbAccesosRapidos" Style="{StaticResource DarkComboBox}" Width="135" Height="32" SelectionChanged="CbAccesosRapidos_SelectionChanged">
+                            <ComboBoxItem Content="Día actual" Tag="Hoy"/>
+                            <ComboBoxItem Content="Semana actual" Tag="Semana"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- FECHA DE REFERENCIA -->
                     <StackPanel>
-                        <TextBlock Text="PERIODO SEMANAL" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
+                        <TextBlock Text="FECHA DE REFERENCIA" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="◀" Width="40" Height="32" Style="{StaticResource HeaderButtonStyle}" Click="BtnSemanaAtras_Click"/>
-                            <DatePicker x:Name="dpMaestro" Width="150" Height="32" Margin="5,0" SelectedDateChanged="DpMaestro_SelectedDateChanged"/>
-                            <Button Content="▶" Width="40" Height="32" Style="{StaticResource HeaderButtonStyle}" Click="BtnSemanaAdelante_Click"/>
-                            <TextBlock x:Name="lblRangoTexto" Text="DEL -- AL --" Foreground="{StaticResource AccentBlue}" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                            <Button Content="◀" Width="30" Height="32" Style="{StaticResource HeaderButtonStyle}" Click="BtnAtras_Click"/>
+                            <DatePicker x:Name="dpMaestro" Width="120" Height="32" Margin="5,0" SelectedDateChanged="DpMaestro_SelectedDateChanged"/>
+                            <Button Content="▶" Width="30" Height="32" Style="{StaticResource HeaderButtonStyle}" Click="BtnAdelante_Click"/>
+
+                            <TextBlock x:Name="lblRangoTexto" Text="DEL --            AL --" Foreground="{StaticResource AccentBlue}" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,0,0"/>
                         </StackPanel>
                     </StackPanel>
-                    <Button x:Name="btnLimpiar" Content="LIMPIAR" Width="80" Height="32" Click="BtnLimpiar_Click" Style="{StaticResource HeaderButtonStyle}" Margin="30,0,0,0" VerticalAlignment="Bottom"/>
+
+                    <Button x:Name="btnLimpiar" Content="ACTUAL" Width="80" Height="32" Click="BtnLimpiar_Click" Style="{StaticResource HeaderButtonStyle}" Margin="20,0,0,0" VerticalAlignment="Bottom"/>
                 </StackPanel>
             </Border>
 
-            <Border Grid.Row="1" Background="#0D1016" BorderBrush="{StaticResource BorderGray}" BorderThickness="1" CornerRadius="8">
-                <DataGrid x:Name="dgAsignaciones" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
-                          Background="Transparent" RowHeight="50" BorderThickness="0" Foreground="White"
-                          HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#1A1F26">
-                    <DataGrid.Resources>
-                        <Style TargetType="DataGridRow">
-                            <Setter Property="Background" Value="Transparent"/>
-                            <Style.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#11141B"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
+            <!-- TABLAS -->
+            <Grid Grid.Row="1">
+                <Border x:Name="ContenedorSemanal" Background="#0D1016" BorderBrush="{StaticResource BorderGray}" BorderThickness="1" CornerRadius="8">
+                    <DataGrid x:Name="dgAsignacionesSemana" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
+                              Background="Transparent" RowHeight="65" BorderThickness="0" Foreground="White"
+                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#1A1F26">
+                        <DataGrid.Resources>
+                            <Style TargetType="DataGridRow">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#11141B"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                            <Style TargetType="DataGridCell">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="TextBlock.TextAlignment" Value="Center"/>
+                                <Setter Property="Padding" Value="0,5"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="#1A2F45"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="#161920"/>
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryYellow}"/>
+                                <Setter Property="Padding" Value="12"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource BorderGray}"/>
+                                <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </DataGrid.Resources>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="ID" Binding="{Binding IdEmpleado}" Width="50" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="EMPLEADO" Binding="{Binding NombreEmpleado}" Width="180" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="LUN" Binding="{Binding Lunes}" Width="*" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="MAR" Binding="{Binding Martes}" Width="*" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="MIÉ" Binding="{Binding Miercoles}" Width="*" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="JUE" Binding="{Binding Jueves}" Width="*" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="VIE" Binding="{Binding Viernes}" Width="*" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="SÁB" Binding="{Binding Sabado}" Width="*" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="DOM" Binding="{Binding Domingo}" Width="*" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
 
-                        <Style TargetType="DataGridCell">
-                            <Setter Property="Background" Value="Transparent"/>
-                            <Setter Property="BorderThickness" Value="0"/>
-
-                            <!-- AJUSTES AÑADIDOS: Centrado de texto y espaciado (aire) -->
-                            <Setter Property="TextBlock.TextAlignment" Value="Center"/>
-                            <Setter Property="Padding" Value="0,15"/>
-
-                            <Style.Triggers>
-                                <Trigger Property="IsSelected" Value="True">
-                                    <Setter Property="Background" Value="#1A2F45"/>
-                                    <Setter Property="Foreground" Value="White"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-
-                        <Style TargetType="DataGridColumnHeader">
-                            <Setter Property="Background" Value="#161920"/>
-                            <Setter Property="Foreground" Value="{StaticResource PrimaryYellow}"/>
-                            <Setter Property="Padding" Value="12"/>
-                            <Setter Property="FontWeight" Value="Bold"/>
-                            <Setter Property="BorderBrush" Value="{StaticResource BorderGray}"/>
-                            <Setter Property="BorderThickness" Value="0,0,0,1"/>
-
-                            <!-- AJUSTE AÑADIDO: Centrado de los títulos de las columnas -->
-                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                        </Style>
-                    </DataGrid.Resources>
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="ID" Binding="{Binding IdEmpleado}" Width="50"/>
-                        <DataGridTextColumn Header="EMPLEADO" Binding="{Binding NombreEmpleado}" Width="200"/>
-                        <DataGridTextColumn Header="LUN" Binding="{Binding Lunes}" Width="*"/>
-                        <DataGridTextColumn Header="MAR" Binding="{Binding Martes}" Width="*"/>
-                        <DataGridTextColumn Header="MIÉ" Binding="{Binding Miercoles}" Width="*"/>
-                        <DataGridTextColumn Header="JUE" Binding="{Binding Jueves}" Width="*"/>
-                        <DataGridTextColumn Header="VIE" Binding="{Binding Viernes}" Width="*"/>
-                        <DataGridTextColumn Header="SÁB" Binding="{Binding Sabado}" Width="*"/>
-                        <DataGridTextColumn Header="DOM" Binding="{Binding Domingo}" Width="*"/>
-
-                        <DataGridTextColumn Header="TOTAL" Binding="{Binding TotalSemana}" Width="110">
-                            <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Foreground" Value="{StaticResource PrimaryYellow}"/>
-                                    <Setter Property="FontWeight" Value="Bold"/>
-                                    <Setter Property="HorizontalAlignment" Value="Center"/>
-                                    <Setter Property="VerticalAlignment" Value="Center"/>
-                                </Style>
-                            </DataGridTextColumn.ElementStyle>
-                        </DataGridTextColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Border>
+                <Border x:Name="ContenedorPlano" Visibility="Hidden" Background="#0D1016" BorderBrush="{StaticResource BorderGray}" BorderThickness="1" CornerRadius="8">
+                    <DataGrid x:Name="dgAsignacionesPlana" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
+                              Background="Transparent" RowHeight="45" BorderThickness="0" Foreground="White"
+                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#1A1F26">
+                        <DataGrid.Resources>
+                            <Style TargetType="DataGridRow">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#11141B"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                            <Style TargetType="DataGridCell">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="TextBlock.TextAlignment" Value="Center"/>
+                                <Setter Property="Padding" Value="0,5"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="#1A2F45"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="#161920"/>
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryYellow}"/>
+                                <Setter Property="Padding" Value="12"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource BorderGray}"/>
+                                <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </DataGrid.Resources>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="ID" Binding="{Binding IdEmpleado}" Width="60" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="FECHA" Binding="{Binding Fecha}" Width="100" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="EMPLEADO" Binding="{Binding NombreEmpleado}" Width="250" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="UBICACIÓN" Binding="{Binding Ubicacion}" Width="150" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="TURNO" Binding="{Binding Turno}" Width="*" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                            <DataGridTextColumn Header="ESTATUS" Binding="{Binding Estatus}" Width="150" ElementStyle="{StaticResource MultilineElementStyle}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+            </Grid>
         </Grid>
 
+        <!-- FOOTER -->
         <Border Grid.Row="2" Style="{StaticResource StatCard}" Padding="10" Margin="0,15,0,0">
-            <TextBlock Text="SECORVI v2.0 | REPORTE SEMANAL" Foreground="{StaticResource TextMuted}" FontSize="9" HorizontalAlignment="Right"/>
+            <TextBlock Text="SECORVI v2.0 | REPORTE Y FILTRADO AVANZADO DE MONITOREO" Foreground="{StaticResource TextMuted}" FontSize="9" HorizontalAlignment="Right"/>
         </Border>
     </Grid>
 </Page>

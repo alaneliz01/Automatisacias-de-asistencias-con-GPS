@@ -112,29 +112,31 @@
                 <!-- MENÚ SIMPLIFICADO -->
                 <StackPanel Grid.Row="1" Margin="10,20">
                     <TextBlock Text="NÚCLEO OPERATIVO" Foreground="#4B5563" FontSize="10" FontWeight="Bold" Margin="15,0,0,10"/>
-
                     <Button Style="{StaticResource MenuButtonStyle}" Content="📊 PANEL PRINCIPAL" Click="NavPanel_Click"/>
-                    <Button Style="{StaticResource MenuButtonStyle}" Content="⏱ GESTIÓN DE TURNOS" Click="NavTurnos_Click"/>
 
                     <Separator Background="#1A1F26" Margin="15,15"/>
 
+                    <TextBlock Text="REPORTES" Foreground="#4B5563" FontSize="10" FontWeight="Bold" Margin="15,0,0,10"/>
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="⏱ GESTIÓN DE TURNOS" Click="NavTurnos_Click"/>
+                    <Separator Background="#1A1F26" Margin="15,15"/>
+
                     <TextBlock Text="SEGURIDAD INTERNA" Foreground="#4B5563" FontSize="10" FontWeight="Bold" Margin="15,0,0,10"/>
-                    <!-- Sugerencia de Tercer Módulo: Historial de Seguridad -->
-                </StackPanel>
 
-                <!-- FOOTER -->
-                <Border Grid.Row="2" Background="#0B0D12" Padding="15,0">
-                    <Grid>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="SISTEMA ACTIVO" Foreground="#2ECC71" FontSize="9" FontWeight="Bold"/>
-                            <TextBlock Text="MODO TERMINAL" Foreground="#4B5563" FontSize="10"/>
-                        </StackPanel>
 
-                        <Button HorizontalAlignment="Right" VerticalAlignment="Center" Content="🚪" 
+                    <!-- FOOTER -->
+                    <Border Grid.Row="2" Background="#0B0D12" Padding="15,0">
+                        <Grid>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="SISTEMA ACTIVO" Foreground="#2ECC71" FontSize="9" FontWeight="Bold"/>
+                                <TextBlock Text="MODO TERMINAL" Foreground="#4B5563" FontSize="10"/>
+                            </StackPanel>
+
+                            <Button HorizontalAlignment="Right" VerticalAlignment="Center" Content="🚪" 
                                 ToolTip="Cerrar Sesión" Background="Transparent" BorderThickness="0" 
                                 Foreground="#FF5252" FontSize="16" Cursor="Hand" Click="BtnCerrarSesion_Click"/>
-                    </Grid>
-                </Border>
+                        </Grid>
+                    </Border>
+                </StackPanel>
             </Grid>
         </Border>
 

@@ -19,7 +19,7 @@ namespace Secorvi
     }
     public static class DataService
     {
-        private static string connectionString = "Server=localhost;Database=secorvi_db;Uid=root;Pwd=2037888;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
+        private static string connectionString = "Server=localhost;Port=3307;Database=secorvi_db;Uid=root;Pwd=;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
 
         public static List<Empleado> Empleados { get; set; } = new List<Empleado>();
         public static List<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
@@ -67,7 +67,7 @@ namespace Secorvi
                 try
                 {
                     conn.Open();
-                    // Seleccionamos empleados activos
+
                     var cmd = new MySqlCommand("SELECT * FROM empleados WHERE estatus = 'Activo'", conn);
                     using (var r = cmd.ExecuteReader())
                     {
@@ -107,7 +107,7 @@ namespace Secorvi
                         {
                             Ubicaciones.Add(new Ubicacion
                             {
-                                id_ubicacion = Convert.ToInt32(r["id_ubicacion"]), // Antes decía id_lugar
+                                id_ubicacion = Convert.ToInt32(r["id_ubicacion"]),
                                 nombre_lugar = r["nombre_lugar"].ToString(),
                                 latitud = Convert.ToDecimal(r["latitud"]),
                                 longitud = Convert.ToDecimal(r["longitud"]),
@@ -129,7 +129,6 @@ namespace Secorvi
                 try
                 {
                     conn.Open();
-                    // El query ahora refleja la estructura real de la tabla 'asignaciones'
                     var cmd = new MySqlCommand("SELECT * FROM asignaciones", conn);
                     using (var r = cmd.ExecuteReader())
                     {
@@ -164,14 +163,13 @@ namespace Secorvi
 
                 var cmd = new MySqlCommand(query, conn);
 
-                // 1. Manejo de IDs y Fechas (Sin cambios)
+
                 cmd.Parameters.AddWithValue("@emp", a.id_empleado);
                 cmd.Parameters.AddWithValue("@ubi", a.id_ubicacion <= 0 ? 1 : a.id_ubicacion);
                 cmd.Parameters.AddWithValue("@fec", a.fecha.Date);
                 cmd.Parameters.AddWithValue("@ini", a.hora_inicio);
                 cmd.Parameters.AddWithValue("@fin", a.hora_fin);
 
-                // 2. Descripción: Forzamos máximo 16 caracteres (límite de tu DB)
                 string d = (a.descripcion_del_turno ?? "").Trim();
                 if (d.Length > 16) d = d.Substring(0, 16);
                 cmd.Parameters.Add("@desc", MySqlDbType.VarChar, 16).Value = d;
@@ -272,7 +270,6 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                // El estatus siempre inicia en 'Activo' por defecto
                 string query = @"INSERT INTO empleados 
                                 (nombre_completo, telefono, id_rol, estatus, usuario, contrasena, matricula) 
                                 VALUES (@nom, @tel, @rol, 'Activo', @usu, @con, @mat)";
@@ -289,23 +286,33 @@ namespace Secorvi
                 cmd.ExecuteNonQuery();
             }
 
-            // Refrescamos la lista local para que el Panel de Control vea al nuevo empleado
             CargarEmpleados();
         }
 
-        // --- GESTIÓN DE EMPLEADOS: BAJA LÓGICA ---
         public static void EliminarEmpleado(int id)
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                // Siguiendo tu lógica de 'Baja Lógica' para no romper integridad referencial
-                string query = "UPDATE empleados SET estatus = 'Inactivo' WHERE id_empleado = @id";
-                var cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@id", id);
                 conn.Open();
-                cmd.ExecuteNonQuery();
+
+
+                string queryAsignaciones = "DELETE FROM asignaciones WHERE id_empleado = @id";
+                using (var cmdAsig = new MySqlCommand(queryAsignaciones, conn))
+                {
+                    cmdAsig.Parameters.AddWithValue("@id", id);
+                    cmdAsig.ExecuteNonQuery();
+                }
+
+                string queryEmpleado = "DELETE FROM empleados WHERE id_empleado = @id";
+                using (var cmdEmp = new MySqlCommand(queryEmpleado, conn))
+                {
+                    cmdEmp.Parameters.AddWithValue("@id", id);
+                    cmdEmp.ExecuteNonQuery();
+                }
             }
+
             CargarEmpleados();
+            CargarAsignaciones();
         }
         // --- GESTIÓN DE UBICACIONES ---
         public static void AgregarUbicacion(Ubicacion u)
@@ -328,13 +335,13 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                // SQL corregido con id_ubicacion
+
                 string query = "UPDATE ubicaciones SET latitud = @lat, longitud = @lng, radio_permitido = @rad WHERE id_ubicacion = @id";
                 var cmd = new MySqlCommand(query, conn);
                 cmd.Parameters.AddWithValue("@lat", u.latitud);
                 cmd.Parameters.AddWithValue("@lng", u.longitud);
                 cmd.Parameters.AddWithValue("@rad", u.radio_permitido);
-                cmd.Parameters.AddWithValue("@id", u.id_ubicacion); // Antes u.id_lugar
+                cmd.Parameters.AddWithValue("@id", u.id_ubicacion);
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -348,8 +355,7 @@ namespace Secorvi
                 conn.Open();
                 foreach (var ubi in lista)
                 {
-                    // CORRECCIÓN: DELETE FROM ubicaciones WHERE id_ubicacion = @id
-                    string query = "DELETE FROM ubicaciones WHERE id_ubicacion = @id"; // Antes id_lugar
+                    string query = "DELETE FROM ubicaciones WHERE id_ubicacion = @id"; 
                     using (var cmd = new MySqlCommand(query, conn))
                     {
                         cmd.Parameters.AddWithValue("@id", ubi.id_ubicacion);
@@ -360,8 +366,6 @@ namespace Secorvi
             CargarUbicaciones();
         }
 
-        // --- GESTIÓN DE EMPLEADOS: ROLES ---
-        // --- GESTIÓN DE EMPLEADOS: ACTUALIZACIÓN GLOBAL ---
         public static void ActualizarEmpleado(Empleado emp)
         {
             using (var conn = new MySqlConnection(connectionString))
@@ -376,8 +380,6 @@ namespace Secorvi
                 cmd.Parameters.AddWithValue("@rol", emp.id_rol);
                 cmd.Parameters.AddWithValue("@id", emp.id_empleado);
 
-                // Manejo táctico de nulos: Si bajaron al usuario a Agente (Rol 3), la contraseña viene como null.
-                // En SQL debemos traducirlo explícitamente a DBNull.Value para limpiar el campo.
                 if (string.IsNullOrEmpty(emp.contrasena))
                 {
                     cmd.Parameters.AddWithValue("@con", DBNull.Value);
@@ -423,6 +425,68 @@ namespace Secorvi
                 }
             }
             CargarAsignaciones(); // Refrescamos la lista global
+        }
+        // --- GESTIÓN DE UBICACIONES: NUEVOS MÉTODOS PARA EL MAPA ---
+
+        public static int CrearUbicacionRetornandoId(Ubicacion u)
+        {
+            int nuevoId = 0;
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                // Insertamos y pedimos el último ID generado en la misma ejecución
+                string query = @"INSERT INTO ubicaciones (nombre_lugar, latitud, longitud, radio_permitido) 
+                                 VALUES (@nom, @lat, @lng, @rad);
+                                 SELECT LAST_INSERT_ID();";
+
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@nom", u.nombre_lugar);
+                cmd.Parameters.AddWithValue("@lat", u.latitud);
+                cmd.Parameters.AddWithValue("@lng", u.longitud);
+
+                // Si la ubicación nueva no tiene radio (0), le ponemos 200 por defecto para el mapa
+                cmd.Parameters.AddWithValue("@rad", u.radio_permitido > 0 ? u.radio_permitido : 200);
+
+                try
+                {
+                    conn.Open();
+                    // ExecuteScalar ejecuta el query y retorna la primera columna de la primera fila (nuestro ID)
+                    nuevoId = Convert.ToInt32(cmd.ExecuteScalar());
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Error al crear ubicación desde mapa: " + ex.Message);
+                    throw; // Lanzamos el error para que tu MessageBox en la vista Mapa lo atrape
+                }
+            }
+
+            // Refrescamos la lista global para que aparezca la nueva sugerencia
+            CargarUbicaciones();
+            return nuevoId;
+        }
+
+        public static void EliminarUbicacion(int idUbicacion)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                string query = "DELETE FROM ubicaciones WHERE id_ubicacion = @id";
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@id", idUbicacion);
+
+                try
+                {
+                    conn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Error al eliminar ubicación: " + ex.Message);
+                    // Si el error es por Llave Foránea (el lugar ya tiene asignaciones ligadas), lo lanzamos
+                    throw new Exception("No se puede eliminar la ubicación porque probablemente ya esté asignada a un turno.", ex);
+                }
+            }
+
+            // Actualizamos la memoria
+            CargarUbicaciones();
         }
     }
 }

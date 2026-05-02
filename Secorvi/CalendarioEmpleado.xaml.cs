@@ -157,7 +157,8 @@ namespace Secorvi
             if (lblRangoSemana != null)
                 lblRangoSemana.Text = $"{_lunesActual:dd MMM} - {_lunesActual.AddDays(6):dd MMM}".ToUpper();
 
-            lblFechaHoraActual.Text = $"SINCRO_DATA: {DateTime.Now:HH:mm:ss}";
+            // Cambiado a formato 12 horas con AM/PM (hh:mm:ss tt)
+            lblFechaHoraActual.Text = $"SINCRO_DATA: {DateTime.Now:hh:mm:ss tt}";
         }
 
         private void RenderAsignacion(Asignacion asig, ref int s, ref int d, ref int v)
@@ -167,7 +168,13 @@ namespace Secorvi
             string est = asig.estatus?.ToUpper() ?? "";
 
             Brush back = (this.TryFindResource("StateActiveRed") as Brush) ?? Brushes.DarkRed;
-            string txt = $"{asig.hora_inicio:hh\\:mm} - {asig.hora_fin:hh\\:mm}";
+
+
+            DateTime dtInicio = DateTime.Today.Add(asig.hora_inicio);
+            DateTime dtFin = DateTime.Today.Add(asig.hora_fin);
+            string txt = $"{dtInicio:hh:mm tt} - {dtFin:hh:mm tt}";
+            // ---------------------------------
+
             string tit = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == asig.id_ubicacion)?.nombre_lugar ?? "SERVICIO";
 
             if (est.Contains("DESC"))

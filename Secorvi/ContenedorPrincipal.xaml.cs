@@ -49,6 +49,8 @@ namespace Secorvi
             MainFrame.Navigate(new Turnos());
         }
 
+    
+
         private void NavSeguridad_Click(object sender, RoutedEventArgs e)
         {
             // Módulo de Auditoría: Registro histórico de firmas y cambios de nivel
