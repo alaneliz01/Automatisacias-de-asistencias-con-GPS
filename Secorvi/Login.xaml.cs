@@ -54,6 +54,14 @@ namespace Secorvi
                 return;
             }
 
+            // --- CÓDIGO NUEVO: Candado para evitar choque de tiempos ---
+            if (DataService.Empleados == null || DataService.Empleados.Count == 0)
+            {
+                MostrarAviso("SYSTEM_WAIT: CARGANDO DATOS DB...", "#332B00", "#FFB300");
+                return;
+            }
+            // -----------------------------------------------------------
+
             // Buscamos al usuario en la base de datos (DataService)
             var usuario = DataService.Empleados.FirstOrDefault(x =>
                 x.usuario.Equals(user, StringComparison.OrdinalIgnoreCase) &&
@@ -75,7 +83,6 @@ namespace Secorvi
                     SesionActual.Usuario = usuario;
 
                     // 2. CORRECCIÓN: Pasamos el objeto 'usuario' al constructor del Contenedor
-                    // Esto permite que el nombre aparezca en la barra superior automáticamente
                     ContenedorPrincipal principal = new ContenedorPrincipal(usuario);
                     principal.Show();
 
@@ -93,7 +100,6 @@ namespace Secorvi
                 MostrarAviso("AUTH_FAILURE: CREDENCIALES INVÁLIDAS", "#3D1B1E", "#FF5252");
             }
         }
-
         private void MostrarAviso(string mensaje, string colorHexFondo, string colorHexTexto)
         {
             var converter = new BrushConverter();

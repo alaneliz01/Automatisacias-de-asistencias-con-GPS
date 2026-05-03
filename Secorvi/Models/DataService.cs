@@ -19,11 +19,16 @@ namespace Secorvi
     }
     public static class DataService
     {
-        private static string connectionString = "Server=localhost;Port=3307;Database=secorvi_db;Uid=root;Pwd=;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
-
-        public static List<Empleado> Empleados { get; set; } = new List<Empleado>();
+        // Tu conexión a Docker (Esto está bien)
+        private static string connectionString = "Server=localhost;Port=3307;Database=secorvi_db;Uid=root;Pwd=secorvi_root;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
+        // 1. Tienes la lista de Ubicaciones
         public static List<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
+
+        // 2. Tienes la lista de Asignaciones
         public static List<Asignacion> Asignaciones { get; set; } = new List<Asignacion>();
+
+        // 3. ¡ESTA ES LA LÍNEA QUE TE FALTA! Agrégala exactamente aquí:
+        public static List<Empleado> Empleados { get; set; } = new List<Empleado>();
 
         public static void ActualizarTodo()
         {
@@ -35,9 +40,11 @@ namespace Secorvi
 
         private static void SincronizarEstatusVistaJefe()
         {
-            foreach (var emp in Empleados)
+            // 1. Agregamos .ToList() a Empleados
+            foreach (var emp in Empleados.ToList())
             {
-                var asig = Asignaciones.FirstOrDefault(a => a.id_empleado == emp.id_empleado && a.fecha.Date == DateTime.Today);
+                // 2. Agregamos .ToList() a Asignaciones
+                var asig = Asignaciones.ToList().FirstOrDefault(a => a.id_empleado == emp.id_empleado && a.fecha.Date == DateTime.Today);
                 if (asig != null)
                 {
                     emp.estatus_asistencia = asig.estatus;
@@ -57,7 +64,6 @@ namespace Secorvi
                 }
             }
         }
-
         // --- GESTIÓN DE EMPLEADOS ---
         public static void CargarEmpleados()
         {
@@ -87,7 +93,11 @@ namespace Secorvi
                         }
                     }
                 }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Error Empleados: " + ex.Message); }
+                catch (Exception ex)
+                {
+                    // Esto nos obligará a ver el error en la pantalla
+                    System.Windows.MessageBox.Show("Error conectando a BD (Empleados): " + ex.Message);
+                }
             }
         }
 
@@ -116,7 +126,10 @@ namespace Secorvi
                         }
                     }
                 }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Error Ubicaciones: " + ex.Message); }
+                catch (Exception ex)
+                {
+                    System.Windows.MessageBox.Show("Error conectando a BD (Empleados): " + ex.Message);
+                }
             }
         }
 
@@ -353,9 +366,10 @@ namespace Secorvi
             using (var conn = new MySqlConnection(connectionString))
             {
                 conn.Open();
-                foreach (var ubi in lista)
+                // Agregamos .ToList() aquí también
+                foreach (var ubi in lista.ToList())
                 {
-                    string query = "DELETE FROM ubicaciones WHERE id_ubicacion = @id"; 
+                    string query = "DELETE FROM ubicaciones WHERE id_ubicacion = @id";
                     using (var cmd = new MySqlCommand(query, conn))
                     {
                         cmd.Parameters.AddWithValue("@id", ubi.id_ubicacion);
@@ -365,7 +379,6 @@ namespace Secorvi
             }
             CargarUbicaciones();
         }
-
         public static void ActualizarEmpleado(Empleado emp)
         {
             using (var conn = new MySqlConnection(connectionString))

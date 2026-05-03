@@ -173,6 +173,18 @@
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
+                    <DataGridTextColumn Header="TELÉFONO" Binding="{Binding telefono}" Width="Auto" MinWidth="120">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Foreground" Value="#9CA3AF"/>
+                                <!-- Tono gris para no quitar protagonismo al nombre -->
+                                <Setter Property="FontFamily" Value="Consolas"/>
+                                <!-- Estilo terminal -->
+                                <Setter Property="Margin" Value="10,0"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
 
                     <DataGridTemplateColumn Header="ESTATUS ASISTENCIA" Width="Auto" MinWidth="180">
                         <DataGridTemplateColumn.CellTemplate>
