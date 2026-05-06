@@ -4,26 +4,23 @@ namespace Secorvi.Models
 {
     public class Asistencia
     {
-        public int IdRegistro { get; set; }
+        public int id_registro { get; set; }
+        public int id_empleado { get; set; }
+        public int id_asignacion { get; set; }
+        public int id_ubicacion { get; set; }
 
-        public int IdEmpleado { get; set; }
-
-        // Coincide con fecha_inicio (DATE)
-        public DateTime FechaInicio { get; set; }
-
-        // Coincide con hora_inicio (TIME)
-        public TimeSpan HoraInicio { get; set; }
-
-        public DateTime? FechaFin { get; set; }
-        public TimeSpan? HoraFin { get; set; }
-
+        public DateTime fecha_inicio { get; set; }
+        public TimeSpan hora_inicio { get; set; }
+        public DateTime? fecha_fin { get; set; }
+        public TimeSpan? hora_fin { get; set; }
+        public string estatus { get; set; }
+        public decimal? latitud { get; set; }
+        public decimal? longitud { get; set; }
+        public string? link_mapa { get; set; }
+        public decimal? latitud_salida { get; set; }
+        public decimal? longitud_salida { get; set; }
+        public string? link_mapa_salida { get; set; }
+        public string estado { get; set; }
         public string MetodoRegistro { get; set; } = "GPS";
-       
-
-        public double Latitud { get; set; }
-        public double Longitud { get; set; }
-
-        // Coincide con link_mapa de tu SQL
-        public string? LinkMapa { get; set; }
     }
 }

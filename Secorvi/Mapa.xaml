@@ -106,8 +106,12 @@
                     </Border>
                 </StackPanel>
 
-                <TextBox Grid.Row="1" x:Name="txtBusqueda" Style="{StaticResource TerminalInputStyle}" Margin="0,0,0,10" Tag="FILTRAR LISTA..."/>
-
+                <TextBox Grid.Row="1" 
+                     x:Name="txtBusqueda" 
+                     Style="{StaticResource TerminalInputStyle}" 
+                     Margin="0,0,0,10" 
+                     Tag="FILTRAR LISTA..." 
+                     TextChanged="txtBusqueda_TextChanged"/>
                 <ListBox Grid.Row="2" x:Name="lstUbicaciones" Background="Transparent" BorderThickness="0" Margin="0,0,0,10" SelectionChanged="lstUbicaciones_SelectionChanged">
                     <ListBox.ItemTemplate>
                         <DataTemplate>

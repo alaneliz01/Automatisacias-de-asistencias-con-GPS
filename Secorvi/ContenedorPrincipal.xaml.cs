@@ -1,6 +1,7 @@
-﻿using System;
+﻿using Secorvi.Models;
+using System;
+using System.Configuration;
 using System.Windows;
-using Secorvi.Models;
 
 namespace Secorvi
 {
@@ -34,6 +35,11 @@ namespace Secorvi
             {
                 lblNombreUsuario.Text = _operadorActivo.nombre_completo.ToUpper();
             }
+        }
+        private void NavConfiguracion_Click(object sender, RoutedEventArgs e)
+        {
+            
+            MainFrame.Navigate(new Configuracion());
         }
 
         #region Navegación de Módulos

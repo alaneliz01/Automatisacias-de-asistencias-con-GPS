@@ -15,7 +15,7 @@ namespace Secorvi
     {
         private double _selectedLat = 0, _selectedLng = 0;
         private int _idEmpleado;
-        private int _idUbicacionSeleccionada = 0; // Para guardar el ID de la tabla ubicaciones
+        private int _idUbicacionSeleccionada = 0; 
         private List<DateTime> _fechasDestino;
 
         public Mapa(int idEmpleado, List<DateTime> fechas)
@@ -24,11 +24,14 @@ namespace Secorvi
             _idEmpleado = idEmpleado;
             _fechasDestino = fechas;
 
+            // 1. Forzamos la fecha de hoy en el selector visual si no hay fechas previas
+            if (_fechasDestino == null || _fechasDestino.Count == 0)
+            {
+                _fechasDestino = new List<DateTime> { DateTime.Today };
+            }
             ConfigurarDropdownsHoras();
             RefrescarListaUbicaciones();
             _ = InitMap();
-
-            // 1. CONFIGURAR EL CLICK DERECHO PARA LA LISTA DE UBICACIONES
             ConfigurarMenuContextualUbicaciones();
         }
 
@@ -55,13 +58,10 @@ namespace Secorvi
                 {
                     try
                     {
-                        // IMPORTANTE: Debes crear este método en tu clase DataService
-                        // Que ejecute el DELETE FROM Ubicaciones WHERE id = u.id_ubicacion
                         DataService.EliminarUbicacion(u.id_ubicacion);
 
                         MessageBox.Show("Ubicación eliminada correctamente.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
 
-                        // Limpiamos selección si es la que estaba activa
                         if (_idUbicacionSeleccionada == u.id_ubicacion)
                         {
                             _idUbicacionSeleccionada = 0;
@@ -232,75 +232,130 @@ namespace Secorvi
             if (lstUbicaciones.SelectedItem is Ubicacion u)
             {
                 txtNombrePunto.Text = u.nombre_lugar;
-                _idUbicacionSeleccionada = u.id_ubicacion; // Guardamos el ID real de la base de datos
+                _idUbicacionSeleccionada = u.id_ubicacion;
                 _selectedLat = (double)u.latitud;
                 _selectedLng = (double)u.longitud;
+
                 txtCoords.Text = string.Format(CultureInfo.InvariantCulture, "{0:F6}, {1:F6}", _selectedLat, _selectedLng);
                 mapaWebView.ExecuteScriptAsync($"window.updatePos({_selectedLat.ToString(CultureInfo.InvariantCulture)}, {_selectedLng.ToString(CultureInfo.InvariantCulture)})");
+
+                // Sincronizamos los horarios guardados en la base de datos
+                if (u.hora_inicio_default.HasValue)
+                    SetPickersFromTimeSpan(u.hora_inicio_default.Value, cbHoraInicio, cbAmPmInicio);
+
+                if (u.hora_fin_default.HasValue)
+                    SetPickersFromTimeSpan(u.hora_fin_default.Value, cbHoraFin, cbAmPmFin);
             }
         }
-
         // --- LÓGICA DE ASIGNACIÓN ---
 
         private void BtnGuardar_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                // 1. Validación de seguridad: Asegurarse de tener una ubicación
                 if (_idUbicacionSeleccionada == 0 && (_selectedLat == 0 || _selectedLng == 0))
                 {
-                    MessageBox.Show("Por favor, selecciona una ubicación de la lista o marca un punto en el mapa.", "Aviso");
+                    MessageBox.Show("SISTEMA: Por favor, selecciona una ubicación de la lista o marca un punto en el mapa para continuar.", "AVISO");
                     return;
                 }
 
-                string descripcion = txtNombrePunto.Text.Trim();
+                // Tomamos el nombre que esté escrito en el cuadro de texto (nuestro "Snapshot")
+                string nombreAsignacion = txtNombrePunto.Text.Trim();
+                if (string.IsNullOrEmpty(nombreAsignacion)) nombreAsignacion = "PUNTO DE VIGILANCIA";
 
-                // 2. LÓGICA PARA GUARDAR LA NUEVA UBICACIÓN
-                if (_idUbicacionSeleccionada == 0 && _selectedLat != 0 && _selectedLng != 0)
+                // 2. Gestión de Ubicación Nueva (Si el usuario marcó el mapa manualmente)
+                if (_idUbicacionSeleccionada == 0)
                 {
-                    var nuevaUbicacion = new Ubicacion
+                    var nuevaUbi = new Ubicacion
                     {
-                        nombre_lugar = string.IsNullOrEmpty(descripcion) ? "NUEVO PUNTO MAPA" : descripcion,
-                        // Convierte a decimal si en tu modelo 'Ubicacion' está como decimal. Si está como double, quita el cast.
+                        nombre_lugar = nombreAsignacion,
                         latitud = (decimal)_selectedLat,
                         longitud = (decimal)_selectedLng
                     };
-
-                    _idUbicacionSeleccionada = DataService.CrearUbicacionRetornandoId(nuevaUbicacion);
-
-                    // Refrescamos para que ya salga en la lista para la próxima
+                    _idUbicacionSeleccionada = DataService.CrearUbicacionRetornandoId(nuevaUbi);
                     RefrescarListaUbicaciones();
                 }
 
+                // Obtener las horas seleccionadas en los relojes
                 TimeSpan inicio = GetTimeSpanFromPickers(cbHoraInicio, cbAmPmInicio);
                 TimeSpan fin = GetTimeSpanFromPickers(cbHoraFin, cbAmPmFin);
 
+                // 3. Procesar las fechas
+                bool tieneAsignacionHoy = false;
+
+                if (_fechasDestino == null || _fechasDestino.Count == 0)
+                {
+                    _fechasDestino = new List<DateTime> { DateTime.Today };
+                }
+
                 foreach (var fecha in _fechasDestino)
                 {
+                    bool esHoy = (fecha.Date == DateTime.Today);
+                    if (esHoy) tieneAsignacionHoy = true;
+
+                    // Limpiamos cualquier asignación previa para este empleado en esta fecha específica
                     DataService.EliminarAsignacionPorFecha(_idEmpleado, fecha);
 
                     var nuevaAsig = new Asignacion
                     {
                         id_empleado = _idEmpleado,
-                        id_ubicacion = _idUbicacionSeleccionada, // Ahora siempre tendrá un ID válido
+                        id_ubicacion = _idUbicacionSeleccionada,
                         fecha = fecha,
                         hora_inicio = inicio,
                         hora_fin = fin,
-                        descripcion_del_turno = string.IsNullOrEmpty(descripcion) ? "TURNO" : descripcion,
-                        estatus = "ASIGNADO"
+                        descripcion_del_turno = nombreAsignacion,
+                        estatus = esHoy ? "ACTIVO" : "PROGRAMADO"
                     };
 
                     DataService.CrearAsignacion(nuevaAsig);
                 }
 
-                MessageBox.Show($"¡Éxito! Se han asignado {_fechasDestino.Count} días correctamente.", "Secorvi System");
+                // 4. Mensajes dinámicos e inteligentes
+                string tituloPanel = tieneAsignacionHoy ? "OPERACIÓN ACTIVADA" : "CALENDARIO ACTUALIZADO";
+
+                string mensajeDetalle;
+                if (tieneAsignacionHoy && _fechasDestino.Count > 1)
+                {
+                    mensajeDetalle = $"Se ha ACTIVADO el turno de hoy y se programaron {_fechasDestino.Count - 1} días adicionales correctamente.";
+                }
+                else if (tieneAsignacionHoy)
+                {
+                    mensajeDetalle = "El turno para el día de HOY ha sido registrado y activado en el sistema.";
+                }
+                else
+                {
+                    mensajeDetalle = $"Se han programado {_fechasDestino.Count} días de servicio para fechas posteriores.";
+                }
+
+                MessageBox.Show(mensajeDetalle, tituloPanel, MessageBoxButton.OK, MessageBoxImage.Information);
+
+                // Volver a la pantalla anterior (Calendario/Panel Principal)
                 this.NavigationService?.GoBack();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error al masificar la asignación: " + ex.Message, "Error");
+                MessageBox.Show("ERROR CRÍTICO AL GUARDAR: " + ex.Message, "SISTEMA FALLIDO", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+        private void txtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            string filtro = txtBusqueda.Text.Trim().ToLower();
 
+            if (string.IsNullOrEmpty(filtro))
+            {
+                RefrescarListaUbicaciones();
+            }
+            else
+            {
+                var ubicacionesFiltradas = DataService.Ubicaciones
+                    .Where(u => u.nombre_lugar != null && u.nombre_lugar.ToLower().Contains(filtro))
+                    .OrderBy(u => u.nombre_lugar)
+                    .ToList();
+
+                lstUbicaciones.ItemsSource = ubicacionesFiltradas;
+            }
+        }
         private TimeSpan GetTimeSpanFromPickers(ComboBox cbHora, ComboBox cbAmPm)
         {
             if (string.IsNullOrEmpty(cbHora.Text)) return TimeSpan.Zero;
@@ -319,23 +374,37 @@ namespace Secorvi
         {
             int h = ts.Hours;
             string amPm = "AM";
-            if (h >= 12) { amPm = "PM"; if (h > 12) h -= 12; }
-            if (h == 0) h = 12;
-            cbHora.Text = $"{h:D2}:{ts.Minutes:D2}";
-            cbAmPm.SelectedIndex = (amPm == "PM") ? 1 : 0;
-        }
 
+            if (h >= 12)
+            {
+                amPm = "PM";
+                if (h > 12) h -= 12;
+            }
+            if (h == 0) h = 12;
+
+            string horaBuscada = $"{h:D2}:{ts.Minutes:D2}";
+
+            foreach (var item in cbHora.Items)
+            {
+                if (item.ToString() == horaBuscada)
+                {
+                    cbHora.SelectedItem = item;
+                    break;
+                }
+            }
+
+            foreach (ComboBoxItem item in cbAmPm.Items)
+            {
+                if (item.Content.ToString() == amPm)
+                {
+                    cbAmPm.SelectedItem = item;
+                    break;
+                }
+            }
+        }
         private void BtnTurno8_Click(object sender, RoutedEventArgs e) => AplicarPreajuste(8);
         private void BtnTurno12_Click(object sender, RoutedEventArgs e) => AplicarPreajuste(12);
-        private void BtnTurno24_Click(object sender, RoutedEventArgs e)
-        {
-            cbHoraInicio.Text = "12:00";
-            cbAmPmInicio.SelectedIndex = 0;
-            cbHoraFin.Text = "12:00";
-            cbAmPmFin.SelectedIndex = 0;
-            txtNombrePunto.Text = "24 HORAS";
-        }
-
+        private void BtnTurno24_Click(object sender, RoutedEventArgs e) => AplicarPreajuste(24);
         private void AplicarPreajuste(int h)
         {
             TimeSpan inicio = GetTimeSpanFromPickers(cbHoraInicio, cbAmPmInicio);

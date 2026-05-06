@@ -118,25 +118,28 @@
 
                     <TextBlock Text="REPORTES" Foreground="#4B5563" FontSize="10" FontWeight="Bold" Margin="15,0,0,10"/>
                     <Button Style="{StaticResource MenuButtonStyle}" Content="⏱ GESTIÓN DE TURNOS" Click="NavTurnos_Click"/>
+
                     <Separator Background="#1A1F26" Margin="15,15"/>
 
                     <TextBlock Text="SEGURIDAD INTERNA" Foreground="#4B5563" FontSize="10" FontWeight="Bold" Margin="15,0,0,10"/>
 
+                    <!-- !!! AQUÍ AGREGAMOS EL NUEVO BOTÓN !!! -->
+                    <Button x:Name="btnConfiguracion" Style="{StaticResource MenuButtonStyle}" Content="⚙ CONFIGURACIÓN" Click="NavConfiguracion_Click"/>
+                </StackPanel>
 
-                    <!-- FOOTER -->
-                    <Border Grid.Row="2" Background="#0B0D12" Padding="15,0">
-                        <Grid>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="SISTEMA ACTIVO" Foreground="#2ECC71" FontSize="9" FontWeight="Bold"/>
-                                <TextBlock Text="MODO TERMINAL" Foreground="#4B5563" FontSize="10"/>
-                            </StackPanel>
+                <!-- FOOTER (Ahora sí está en su propio Grid.Row="2" fuera del StackPanel) -->
+                <Border Grid.Row="2" Background="#0B0D12" Padding="15,0">
+                    <Grid>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="SISTEMA ACTIVO" Foreground="#2ECC71" FontSize="9" FontWeight="Bold"/>
+                            <TextBlock Text="MODO TERMINAL" Foreground="#4B5563" FontSize="10"/>
+                        </StackPanel>
 
-                            <Button HorizontalAlignment="Right" VerticalAlignment="Center" Content="🚪" 
+                        <Button HorizontalAlignment="Right" VerticalAlignment="Center" Content="🚪" 
                                 ToolTip="Cerrar Sesión" Background="Transparent" BorderThickness="0" 
                                 Foreground="#FF5252" FontSize="16" Cursor="Hand" Click="BtnCerrarSesion_Click"/>
-                        </Grid>
-                    </Border>
-                </StackPanel>
+                    </Grid>
+                </Border>
             </Grid>
         </Border>
 
@@ -154,7 +157,6 @@
                         <Ellipse Width="8" Height="8" Fill="#FFB300" Margin="0,0,10,0"/>
                         <TextBlock Text="TERMINAL DE CAMPO v2.5" Foreground="#4B5563" FontSize="10" VerticalAlignment="Center" FontWeight="Bold"/>
 
-                        <!-- SECCIÓN NUEVA: NOMBRE DEL OPERADOR -->
                         <Rectangle Width="1" Fill="#2D323E" Margin="20,8" Height="15"/>
                         <TextBlock Text="OPERADOR:" Foreground="#4B5563" FontSize="9" FontWeight="Black" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <TextBlock x:Name="lblNombreUsuario" Text="IDENTIFICANDO..." Foreground="White" FontSize="10" VerticalAlignment="Center" FontWeight="Bold"/>

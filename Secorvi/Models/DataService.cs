@@ -20,14 +20,12 @@ namespace Secorvi
     public static class DataService
     {
         // Tu conexión a Docker (Esto está bien)
-        private static string connectionString = "Server=localhost;Port=3307;Database=secorvi_db;Uid=root;Pwd=secorvi_root;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
-        // 1. Tienes la lista de Ubicaciones
+        private static string connectionString = "Server=localhost;Port=3307;Database=secorvi_db;Uid=root;Pwd=2037888;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
         public static List<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
 
         // 2. Tienes la lista de Asignaciones
         public static List<Asignacion> Asignaciones { get; set; } = new List<Asignacion>();
 
-        // 3. ¡ESTA ES LA LÍNEA QUE TE FALTA! Agrégala exactamente aquí:
         public static List<Empleado> Empleados { get; set; } = new List<Empleado>();
 
         public static void ActualizarTodo()
@@ -40,21 +38,69 @@ namespace Secorvi
 
         private static void SincronizarEstatusVistaJefe()
         {
-            // 1. Agregamos .ToList() a Empleados
+            // 1. Consultar estado y HORAS REALES de n8n
+            var asistenciasHoy = new Dictionary<int, (string estado, TimeSpan? entrada, TimeSpan? salida)>();
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                try
+                {
+                    conn.Open();
+                    // Traemos el estado y las horas reales registradas en la tabla 'asistencias'
+                    string query = @"SELECT id_empleado, estado, hora_inicio, hora_fin 
+                             FROM asistencias 
+                             WHERE DATE(fecha_inicio) = CURDATE() OR DATE(fecha_fin) = CURDATE()";
+
+                    using (var cmd = new MySqlCommand(query, conn))
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        while (r.Read())
+                        {
+                            string est = r["estado"] != DBNull.Value ? r["estado"].ToString().ToUpper() : null;
+                            TimeSpan? ent = r["hora_inicio"] != DBNull.Value ? (TimeSpan)r["hora_inicio"] : (TimeSpan?)null;
+                            TimeSpan? sal = r["hora_fin"] != DBNull.Value ? (TimeSpan)r["hora_fin"] : (TimeSpan?)null;
+
+                            asistenciasHoy[Convert.ToInt32(r["id_empleado"])] = (est, ent, sal);
+                        }
+                    }
+                }
+                catch { /* Si hay error, simplemente continúa con los estatus programados */ }
+            }
+
+            // 2. Sincronizar con la lista de Empleados de la vista
             foreach (var emp in Empleados.ToList())
             {
-                // 2. Agregamos .ToList() a Asignaciones
                 var asig = Asignaciones.ToList().FirstOrDefault(a => a.id_empleado == emp.id_empleado && a.fecha.Date == DateTime.Today);
+
                 if (asig != null)
                 {
-                    emp.estatus_asistencia = asig.estatus;
-                    if (asig.hora_inicio == TimeSpan.Zero && asig.hora_fin == TimeSpan.Zero && asig.estatus != "DESCANSO")
+                    // Si n8n tiene un registro de hoy (Asistencia o Salida)
+                    if (asistenciasHoy.ContainsKey(emp.id_empleado))
                     {
-                        emp.info_turno = $"{asig.descripcion_del_turno}: 24 HORAS";
+                        var real = asistenciasHoy[emp.id_empleado];
+                        emp.estatus_asistencia = real.estado ?? asig.estatus;
+
+                        // Formateamos para mostrar las horas reales
+                        string horaIn = real.entrada.HasValue ? real.entrada.Value.ToString(@"hh\:mm") : asig.hora_inicio.ToString(@"hh\:mm");
+                        string horaOut = real.salida.HasValue ? real.salida.Value.ToString(@"hh\:mm") : asig.hora_fin.ToString(@"hh\:mm");
+
+                        if (real.estado == "SALIDA")
+                            emp.info_turno = $"FINALIZADO: {horaIn} - {horaOut}";
+                        else
+                            emp.info_turno = $"EN CURSO: {horaIn} - {horaOut}";
                     }
                     else
                     {
-                        emp.info_turno = $"{asig.descripcion_del_turno}: {asig.hora_inicio:hh\\:mm} - {asig.hora_fin:hh\\:mm}";
+                        // Si aún no checan, mostramos lo programado
+                        emp.estatus_asistencia = asig.estatus;
+
+                        if (asig.hora_inicio == TimeSpan.Zero && asig.hora_fin == TimeSpan.Zero && asig.estatus != "DESCANSO")
+                        {
+                            emp.info_turno = $"{asig.descripcion_del_turno}: 24 HORAS";
+                        }
+                        else
+                        {
+                            emp.info_turno = $"{asig.descripcion_del_turno}: {asig.hora_inicio:hh\\:mm} - {asig.hora_fin:hh\\:mm}";
+                        }
                     }
                 }
                 else
@@ -63,8 +109,7 @@ namespace Secorvi
                     emp.info_turno = "N/A";
                 }
             }
-        }
-        // --- GESTIÓN DE EMPLEADOS ---
+        }        // --- GESTIÓN DE EMPLEADOS ---
         public static void CargarEmpleados()
         {
             Empleados.Clear();
@@ -121,14 +166,16 @@ namespace Secorvi
                                 nombre_lugar = r["nombre_lugar"].ToString(),
                                 latitud = Convert.ToDecimal(r["latitud"]),
                                 longitud = Convert.ToDecimal(r["longitud"]),
-                                radio_permitido = Convert.ToInt32(r["radio_permitido"])
+                                radio_permitido = Convert.ToInt32(r["radio_permitido"]),
+                                hora_inicio_default = r["hora_inicio_default"] != DBNull.Value ? (TimeSpan?)r["hora_inicio_default"] : null,
+                                hora_fin_default = r["hora_fin_default"] != DBNull.Value ? (TimeSpan?)r["hora_fin_default"] : null
                             });
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    System.Windows.MessageBox.Show("Error conectando a BD (Empleados): " + ex.Message);
+                    System.Windows.MessageBox.Show("Error cargando ubicaciones: " + ex.Message);
                 }
             }
         }
@@ -201,11 +248,29 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = "DELETE FROM asignaciones WHERE id_asignacion = @id";
-                var cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@id", idAsignacion);
                 conn.Open();
-                cmd.ExecuteNonQuery();
+                var transaction = conn.BeginTransaction();
+                try
+                {
+                    // Primero borramos los hijos (asistencias)
+                    string queryHijos = "DELETE FROM asistencias WHERE id_asignacion = @id";
+                    var cmd1 = new MySqlCommand(queryHijos, conn, transaction);
+                    cmd1.Parameters.AddWithValue("@id", idAsignacion);
+                    cmd1.ExecuteNonQuery();
+
+                    // Luego borramos el padre (asignacion)
+                    string queryPadre = "DELETE FROM asignaciones WHERE id_asignacion = @id";
+                    var cmd2 = new MySqlCommand(queryPadre, conn, transaction);
+                    cmd2.Parameters.AddWithValue("@id", idAsignacion);
+                    cmd2.ExecuteNonQuery();
+
+                    transaction.Commit();
+                }
+                catch
+                {
+                    transaction.Rollback();
+                    throw;
+                }
             }
             CargarAsignaciones();
         }
@@ -262,11 +327,7 @@ namespace Secorvi
             int proximoId = 1;
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = @"SELECT AUTO_INCREMENT 
-                                FROM information_schema.TABLES 
-                                WHERE TABLE_SCHEMA = 'secorvi_db' 
-                                AND TABLE_NAME = 'empleados'";
-
+                string query = "SELECT IFNULL(MAX(id_empleado), 0) + 1 FROM empleados";
                 MySqlCommand cmd = new MySqlCommand(query, conn);
                 try
                 {
@@ -275,19 +336,21 @@ namespace Secorvi
                     if (result != null && result != DBNull.Value)
                         proximoId = Convert.ToInt32(result);
                 }
-                catch { /* Retornamos 1 por defecto si hay error */ }
+                catch { }
             }
             return proximoId;
         }
+
         public static void AgregarEmpleado(Empleado emp)
         {
             using (var conn = new MySqlConnection(connectionString))
             {
                 string query = @"INSERT INTO empleados 
-                                (nombre_completo, telefono, id_rol, estatus, usuario, contrasena, matricula) 
-                                VALUES (@nom, @tel, @rol, 'Activo', @usu, @con, @mat)";
+                        (id_empleado, nombre_completo, telefono, id_rol, estatus, usuario, contrasena, matricula) 
+                        VALUES (@id, @nom, @tel, @rol, 'Activo', @usu, @con, @mat)";
 
                 var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@id", emp.id_empleado);
                 cmd.Parameters.AddWithValue("@nom", emp.nombre_completo);
                 cmd.Parameters.AddWithValue("@tel", emp.telefono);
                 cmd.Parameters.AddWithValue("@rol", emp.id_rol);
@@ -298,7 +361,6 @@ namespace Secorvi
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
-
             CargarEmpleados();
         }
 
@@ -348,19 +410,33 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
+                // Agregamos nombre_lugar y las horas al UPDATE
+                string query = @"UPDATE ubicaciones 
+                         SET nombre_lugar = @nom, 
+                             latitud = @lat, 
+                             longitud = @lng, 
+                             radio_permitido = @rad,
+                             hora_inicio_default = @hinicio,
+                             hora_fin_default = @hfin
+                         WHERE id_ubicacion = @id";
 
-                string query = "UPDATE ubicaciones SET latitud = @lat, longitud = @lng, radio_permitido = @rad WHERE id_ubicacion = @id";
                 var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@nom", u.nombre_lugar);
                 cmd.Parameters.AddWithValue("@lat", u.latitud);
                 cmd.Parameters.AddWithValue("@lng", u.longitud);
                 cmd.Parameters.AddWithValue("@rad", u.radio_permitido);
+
+                // Validamos si tienen valor o si son nulos
+                cmd.Parameters.AddWithValue("@hinicio", u.hora_inicio_default.HasValue ? (object)u.hora_inicio_default.Value : DBNull.Value);
+                cmd.Parameters.AddWithValue("@hfin", u.hora_fin_default.HasValue ? (object)u.hora_fin_default.Value : DBNull.Value);
+
                 cmd.Parameters.AddWithValue("@id", u.id_ubicacion);
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
             CargarUbicaciones();
         }
-
         public static void EliminarUbicaciones(List<Ubicacion> lista)
         {
             using (var conn = new MySqlConnection(connectionString))
@@ -493,7 +569,6 @@ namespace Secorvi
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine("Error al eliminar ubicación: " + ex.Message);
-                    // Si el error es por Llave Foránea (el lugar ya tiene asignaciones ligadas), lo lanzamos
                     throw new Exception("No se puede eliminar la ubicación porque probablemente ya esté asignada a un turno.", ex);
                 }
             }

@@ -109,8 +109,22 @@ namespace Secorvi
         private void BtnNuevo_Click(object sender, RoutedEventArgs e)
         {
             RegistroEmpleado ventanaRegistro = new RegistroEmpleado { Owner = Window.GetWindow(this) };
+
+            // Si la ventana se cierra con éxito al dar en Guardar
             if (ventanaRegistro.ShowDialog() == true)
+            {
+                // 1. Recargamos los datos en tu tabla para que aparezca el nuevo
                 CargarDatosDesdeDB();
+
+                // 2. Extraemos el ID del empleado que la ventana acaba de crear
+                int idNuevo = ventanaRegistro.IdEmpleadoGenerado;
+
+                // 3. Preparamos las fechas (el día de hoy por defecto)
+                var fechas = new System.Collections.Generic.List<DateTime> { DateTime.Now.Date };
+
+                // 4. Navegamos directamente a la página Mapa (Asignar)
+                this.NavigationService?.Navigate(new Mapa(idNuevo, fechas));
+            }
         }
 
         private void BtnEliminar_Click(object sender, RoutedEventArgs e)
@@ -135,31 +149,7 @@ namespace Secorvi
             }
         }
 
-        private void BtnRoles_Click(object sender, RoutedEventArgs e)
-        {
-            GestionPermisos ventanaPermisos = new GestionPermisos { Owner = Window.GetWindow(this) };
-
-            if (ventanaPermisos.ShowDialog() == true)
-            {
-                int idEmpModificado = ventanaPermisos.IdEmpleadoSeleccionado;
-                int nuevoRol = ventanaPermisos.IdRolSeleccionado;
-                string nuevaPass = ventanaPermisos.NuevaContrasena;
-
-                // Buscamos al empleado en la lista local para actualizarlo
-                var emp = DataService.Empleados.FirstOrDefault(x => x.id_empleado == idEmpModificado);
-                if (emp != null)
-                {
-                    emp.id_rol = nuevoRol; // Asignamos el nuevo ID (3 para Agente)
-                    emp.contrasena = nuevaPass;
-
-                    // Guardamos en la base de datos
-                    DataService.ActualizarEmpleado(emp);
-
-                    // Refrescamos la pantalla (Usando el método que ajustamos antes)
-                    CargarDatosDesdeDB();
-                }
-            }
-        }
+        
         private void BtnAsignacion_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as Button)?.DataContext is Empleado emp)

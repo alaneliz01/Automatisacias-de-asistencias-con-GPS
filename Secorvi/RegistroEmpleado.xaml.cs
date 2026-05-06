@@ -8,6 +8,9 @@ namespace Secorvi
 {
     public partial class RegistroEmpleado : Window
     {
+        // Variable pública para pasar el ID al panel
+        public int IdEmpleadoGenerado { get; private set; }
+
         public RegistroEmpleado()
         {
             InitializeComponent();
@@ -21,7 +24,6 @@ namespace Secorvi
 
         private void BtnGuardar_Click(object sender, RoutedEventArgs e)
         {
-            // Validación de campos requeridos (sin contraseña)
             if (string.IsNullOrWhiteSpace(txtNombre.Text) ||
                 string.IsNullOrWhiteSpace(txtApellido.Text) ||
                 string.IsNullOrWhiteSpace(txtTelefono.Text))
@@ -45,12 +47,13 @@ namespace Secorvi
                     MessageBox.Show("ERROR: El número de teléfono ya está registrado.", "DUPLICADO", MessageBoxButton.OK, MessageBoxImage.Stop);
                     return;
                 }
+                string telLimpio = new string(tel.Where(char.IsDigit).ToArray()); // Solo deja números
 
-                // Mapeo al Modelo (contraseña nula por defecto al ser agente)
                 var nuevoEmpleado = new Empleado
                 {
+                    id_empleado = int.Parse(lblIdGenerado.Text),
                     nombre_completo = $"{nombre} {apellido}".ToUpper(),
-                    telefono = tel,
+                    telefono = telLimpio,
                     usuario = usuarioAuto,
                     contrasena = null,
                     id_rol = int.Parse(lblIdRol.Text),
@@ -59,6 +62,9 @@ namespace Secorvi
                 };
 
                 DataService.AgregarEmpleado(nuevoEmpleado);
+
+                // Guardamos el ID del nuevo empleado en la variable pública antes de cerrar
+                IdEmpleadoGenerado = nuevoEmpleado.id_empleado;
 
                 // Feedback visual sin mostrar contraseña
                 MessageBox.Show($"¡REGISTRO EXITOSO!\n\n" +

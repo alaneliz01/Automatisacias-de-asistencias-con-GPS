@@ -137,9 +137,12 @@ namespace Secorvi
         public async Task ActualizarVistaAsync()
         {
             var visuales = GridCalendario.Children.OfType<FrameworkElement>()
-                            .Where(b => b.Tag?.ToString() == "VISUAL_ASIG").ToList();
-            foreach (var vis in visuales) GridCalendario.Children.Remove(vis);
+                .Where(b => b.Tag?.ToString() == "VISUAL_ASIG").ToList(); // <-- El ToList() aquí es vital
 
+            foreach (var vis in visuales)
+            {
+                GridCalendario.Children.Remove(vis);
+            }
             await Task.Run(() => DataService.ActualizarTodo());
             var asignaciones = DataService.Asignaciones
                 .Where(a => a.id_empleado == _empleado.id_empleado &&
@@ -167,27 +170,61 @@ namespace Secorvi
             col = (col == 0) ? 6 : col - 1;
             string est = asig.estatus?.ToUpper() ?? "";
 
-            Brush back = (this.TryFindResource("StateActiveRed") as Brush) ?? Brushes.DarkRed;
-
-
+            Brush back = Brushes.DarkGray; // Color por defecto
             DateTime dtInicio = DateTime.Today.Add(asig.hora_inicio);
             DateTime dtFin = DateTime.Today.Add(asig.hora_fin);
             string txt = $"{dtInicio:hh:mm tt} - {dtFin:hh:mm tt}";
-            // ---------------------------------
 
-            string tit = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == asig.id_ubicacion)?.nombre_lugar ?? "SERVICIO";
-
-            if (est.Contains("DESC"))
+            // --- SOLUCIÓN AL ERROR DE HILOS ---
+            string tit = "SERVICIO";
+            try
             {
-                back = (this.TryFindResource("StateOffGray") as Brush) ?? Brushes.DarkGray;
+                // Intentamos leer la ubicación sin .ToList() para evitar el error de array.
+                var ubicacion = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == asig.id_ubicacion);
+                if (ubicacion != null)
+                {
+                    tit = ubicacion.nombre_lugar;
+                }
+            }
+            catch
+            {
+                // Si hay un choque de hilos con DataService en este exacto milisegundo, 
+                // evitamos que la app explote y le asignamos un título genérico.
+                tit = "TURNO ASIGNADO";
+            }
+
+            // --- LÓGICA DE ESTATUS ---
+            if (est == "DESCANSO")
+            {
+                back = new SolidColorBrush(Color.FromRgb(50, 55, 65)); // Gris
                 d++; tit = "DESCANSO"; txt = "LIBRE";
             }
-            else if (est.Contains("VAC"))
+            else if (est == "VACACIONES")
             {
-                back = (this.TryFindResource("StateVacationBlue") as Brush) ?? Brushes.DeepSkyBlue;
+                back = Brushes.DeepSkyBlue; // Azul
                 v++; tit = "VACACIONES"; txt = "FULL DAY";
             }
-            else { s++; }
+            else if (est == "FALTA")
+            {
+                back = Brushes.DarkRed; // Rojo Oscuro
+                tit = "FALTA"; txt = "NO ASISTIÓ";
+            }
+            else if (est == "RETRASO")
+            {
+                back = Brushes.DarkOrange; // Naranja
+                tit = "RETRASO"; s++;
+            }
+            else if (est == "ASISTENCIA")
+            {
+                back = Brushes.SeaGreen; // Verde
+                tit = "ASISTENCIA"; s++;
+            }
+            else // CAEN "PROGRAMADO" Y LOS REGISTROS VIEJOS QUE DICEN "ASIGNADO"
+            {
+                back = Brushes.Red; // ROJO
+                tit = "PROGRAMADO"; // Forzamos visualmente a que diga PROGRAMADO aunque en BD diga Asignado
+                s++;
+            }
 
             Border b = new Border { Background = back, CornerRadius = new CornerRadius(6), Margin = new Thickness(8), Padding = new Thickness(10), Tag = "VISUAL_ASIG", IsHitTestVisible = false };
             StackPanel sp = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
@@ -198,7 +235,6 @@ namespace Secorvi
             Grid.SetRow(b, 1); Grid.SetColumn(b, col);
             GridCalendario.Children.Add(b);
         }
-
         private void CrearMenuContexto()
         {
             _menuContexto = new ContextMenu();

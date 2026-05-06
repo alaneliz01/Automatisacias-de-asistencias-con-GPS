@@ -69,7 +69,6 @@ namespace Secorvi
                 string opcion = selectedItem.Tag?.ToString() ?? "";
                 DateTime hoy = DateTime.Today;
 
-                // Desactivamos temporalmente el evento del DatePicker para no disparar cálculos dobles
                 dpMaestro.SelectedDateChanged -= DpMaestro_SelectedDateChanged;
 
                 switch (opcion)
@@ -201,6 +200,7 @@ namespace Secorvi
                 {
                     DataService.CargarAsignaciones();
                     DataService.CargarEmpleados();
+                    DataService.CargarUbicaciones(); // Cargamos ubicaciones globalmente para que ambas vistas las puedan usar
 
                     var asignaciones = DataService.Asignaciones
                         .Where(x => x.fecha.Date >= inicio && x.fecha.Date <= fin)
@@ -213,38 +213,11 @@ namespace Secorvi
 
                     if (modo == "SEMANAL")
                     {
-                        var resultadoSemana = new List<FilaVistaSemanal>();
-                        var grupos = asignaciones.GroupBy(x => x.id_empleado);
-
-                        foreach (var g in grupos)
-                        {
-                            var emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == g.Key);
-                            if (emp == null) continue;
-
-                            resultadoSemana.Add(new FilaVistaSemanal
-                            {
-                                IdEmpleado = g.Key,
-                                NombreEmpleado = emp.nombre_completo?.ToUpper() ?? "SIN NOMBRE",
-                                Lunes = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Monday),
-                                Martes = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Tuesday),
-                                Miercoles = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Wednesday),
-                                Jueves = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Thursday),
-                                Viernes = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Friday),
-                                Sabado = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Saturday),
-                                Domingo = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Sunday)
-                            });
-                        }
-                        Dispatcher.Invoke(() =>
-                        {
-                            dgAsignacionesSemana.ItemsSource = resultadoSemana.OrderBy(x => x.NombreEmpleado).ToList();
-                            _vistaSemanal = CollectionViewSource.GetDefaultView(dgAsignacionesSemana.ItemsSource);
-                            if (_vistaSemanal != null) _vistaSemanal.Filter = FiltroBusquedaSemanal;
-                        });
+                        TablaReportes(asignaciones);
                     }
                     else
                     {
                         var resultadoPlano = new List<FilaVistaPlana>();
-                        DataService.CargarUbicaciones();
 
                         foreach (var a in asignaciones.OrderBy(x => x.fecha))
                         {
@@ -277,29 +250,56 @@ namespace Secorvi
         }
 
         // ==========================================
-        // FORMATO PARA LA UI (TABLAS)
+        // TABLA NORMAL (INTERFAZ DE USUARIO XAML)
+        // ==========================================
+        private void TablaReportes(List<Asignacion> asignaciones)
+        {
+            var resultadoSemana = new List<FilaVistaSemanal>();
+            var grupos = asignaciones.GroupBy(x => x.id_empleado);
+
+            foreach (var g in grupos)
+            {
+                var emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == g.Key);
+                if (emp == null) continue;
+
+                resultadoSemana.Add(new FilaVistaSemanal
+                {
+                    IdEmpleado = g.Key,
+                    NombreEmpleado = emp.nombre_completo?.ToUpper() ?? "SIN NOMBRE",
+                    Lunes = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Monday),
+                    Martes = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Tuesday),
+                    Miercoles = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Wednesday),
+                    Jueves = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Thursday),
+                    Viernes = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Friday),
+                    Sabado = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Saturday),
+                    Domingo = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Sunday)
+                });
+            }
+
+            Dispatcher.Invoke(() =>
+            {
+                dgAsignacionesSemana.ItemsSource = resultadoSemana.OrderBy(x => x.NombreEmpleado).ToList();
+                _vistaSemanal = CollectionViewSource.GetDefaultView(dgAsignacionesSemana.ItemsSource);
+                if (_vistaSemanal != null) _vistaSemanal.Filter = FiltroBusquedaSemanal;
+            });
+        }
+
+        // ==========================================
+        // FORMATO PARA LA UI Y LÓGICA DE ESTATUS
         // ==========================================
         private string GetTurnoTextoSemanal(List<Asignacion> turnos, DayOfWeek dia)
         {
             var t = turnos.FirstOrDefault(x => x.fecha.DayOfWeek == dia);
             if (t == null) return "-";
-            return FormatearTurnoSemanal(t);
-        }
 
-        private string FormatearTurnoSemanal(Asignacion t)
-        {
-            string estatusNorm = t.estatus?.Trim().ToUpper() ?? "";
-            string descNorm = t.descripcion_del_turno?.Trim().ToUpper() ?? "";
+            // Sincronizando la info local con la estructura del Excel: [Fecha] \n [Turno] \n [Lugar] \n [Estatus]
+            var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == t.id_ubicacion);
+            string lugar = ubi?.nombre_lugar?.ToUpper() ?? "SIN UBICACIÓN";
+            string fecha = t.fecha.ToString("dd/MMM").ToUpper();
+            string turno = FormatearTurnoDiario(t);
+            string estatus = FormatearEstatus(t).Replace("✅", "").Replace("⏳", "").Replace("🚪", "").Replace("❌", "").Replace("🏖️", "").Replace("💤", "").Trim();
 
-            if (estatusNorm == "VACACIONES" || descNorm == "VACACIONES") return "VACACIONES";
-            if (estatusNorm == "DÍA LIBRE" || estatusNorm == "DESCANSO" || descNorm.Contains("LIBRE") || descNorm.Contains("DESC")) return "DESCANSO";
-
-            string txtInfo = string.IsNullOrEmpty(descNorm) ? "ASIGNADO" : descNorm;
-            if (t.hora_inicio == TimeSpan.Zero && t.hora_fin == TimeSpan.Zero) return $"{txtInfo}\n24 HORAS";
-
-            DateTime fIni = DateTime.Today.Add(t.hora_inicio);
-            DateTime fFin = DateTime.Today.Add(t.hora_fin);
-            return $"{txtInfo}\n{fIni:hh:mm tt} - {fFin:hh:mm tt}";
+            return $"{fecha}\n{turno}\n📍 {lugar}\n{estatus}";
         }
 
         private string FormatearTurnoDiario(Asignacion t)
@@ -317,15 +317,6 @@ namespace Secorvi
             return $"{fIni:hh:mm tt} - {fFin:hh:mm tt}";
         }
 
-        // ==========================================
-        // LÓGICA DE EXTRACCIÓN DE ESTATUS
-        // ==========================================
-        private string GetSoloEstatus(List<Asignacion> turnos, DayOfWeek dia)
-        {
-            var t = turnos.FirstOrDefault(x => x.fecha.DayOfWeek == dia);
-            return FormatearEstatus(t);
-        }
-
         private string FormatearEstatus(Asignacion t)
         {
             if (t == null) return "-";
@@ -336,7 +327,11 @@ namespace Secorvi
             if (estatusNorm == "VACACIONES" || descNorm == "VACACIONES") return "🏖️ VACACIONES";
             if (estatusNorm == "DÍA LIBRE" || estatusNorm == "DESCANSO" || descNorm.Contains("LIBRE") || descNorm.Contains("DESC")) return "💤 DESCANSO";
 
-            return (estatusNorm == "COMPLETADO" || estatusNorm == "ASISTIÓ") ? "✅ ASISTIÓ" : (estatusNorm == "FALTA" ? "❌ FALTÓ" : "⏳ PENDIENTE");
+            if (estatusNorm == "COMPLETADO" || estatusNorm == "ASISTENCIA" || estatusNorm == "ASISTIÓ") return "✅ ASISTIÓ";
+            if (estatusNorm == "SALIDA") return "🚪 FINALIZADO";
+            if (estatusNorm == "FALTA") return "❌ FALTÓ";
+
+            return "⏳ PENDIENTE";
         }
 
         private void CbEmpleados_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();
@@ -366,34 +361,14 @@ namespace Secorvi
         private void BtnVolver_Click(object sender, RoutedEventArgs e) => NavigationService?.GoBack();
 
         // ==========================================
-        // EXPORTACIONES A EXCEL (NUEVO MENÚ DE 4 OPCIONES)
+        // EXPORTACIÓN A EXCEL (DISEÑO MEJORADO)
         // ==========================================
         private void BtnExportExcel_Click(object sender, RoutedEventArgs e)
         {
-            ContextMenu cm = new ContextMenu();
-
-            MenuItem miSemanal = new MenuItem { Header = "1. Reporte Semanal Básico" };
-            miSemanal.Click += (s, ev) => ExportarReporteSemanal();
-            cm.Items.Add(miSemanal);
-
-            MenuItem miSemanalAsist = new MenuItem { Header = "2. Reporte Semanal + Asistencia" };
-            miSemanalAsist.Click += (s, ev) => ExportarReporteSemanalConAsistencia();
-            cm.Items.Add(miSemanalAsist);
-
-            MenuItem miDiario = new MenuItem { Header = "3. Reporte Diario Básico" };
-            miDiario.Click += (s, ev) => ExportarReporteDiario(false);
-            cm.Items.Add(miDiario);
-
-            MenuItem miDiarioAsist = new MenuItem { Header = "4. Reporte Diario + Asistencia" };
-            miDiarioAsist.Click += (s, ev) => ExportarReporteDiario(true);
-            cm.Items.Add(miDiarioAsist);
-
-            Button btn = sender as Button;
-            cm.PlacementTarget = btn;
-            cm.IsOpen = true;
+            ExportacionReportes();
         }
 
-        private void ExportarReporteSemanal()
+        private void ExportacionReportes()
         {
             if (dpMaestro.SelectedDate == null) return;
             DateTime f = dpMaestro.SelectedDate.Value;
@@ -402,7 +377,9 @@ namespace Secorvi
             DateTime finSemana = inicioSemana.AddDays(6).Date;
 
             DataService.CargarAsignaciones();
+            DataService.CargarUbicaciones();
             var datos = DataService.Asignaciones.Where(x => x.fecha >= inicioSemana && x.fecha <= finSemana).ToList();
+
             if (!datos.Any()) { MessageBox.Show("No hay datos en esta semana.", "Aviso"); return; }
 
             try
@@ -412,186 +389,115 @@ namespace Secorvi
                 {
                     using (var wb = new XLWorkbook())
                     {
-                        var ws = wb.Worksheets.Add("Reporte Semanal");
-                        string[] h = { "ID", "EMPLEADO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO" };
+                        var ws = wb.Worksheets.Add("Reporte");
 
-                        for (int i = 0; i < h.Length; i++)
-                        {
-                            ws.Cell(1, i + 1).Value = h[i];
-                            ws.Cell(1, i + 1).Style.Font.Bold = true;
-                            ws.Cell(1, i + 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFB300");
-                            ws.Cell(1, i + 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                        }
-
-                        int r = 2;
-                        var grupos = datos.GroupBy(x => x.id_empleado);
-                        foreach (var g in grupos)
-                        {
-                            var emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == g.Key);
-                            ws.Cell(r, 1).Value = g.Key;
-                            ws.Cell(r, 2).Value = emp != null ? emp.nombre_completo.ToUpper() : "";
-                            ws.Cell(r, 3).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Monday);
-                            ws.Cell(r, 4).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Tuesday);
-                            ws.Cell(r, 5).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Wednesday);
-                            ws.Cell(r, 6).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Thursday);
-                            ws.Cell(r, 7).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Friday);
-                            ws.Cell(r, 8).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Saturday);
-                            ws.Cell(r, 9).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Sunday);
-
-                            for (int col = 3; col <= 9; col++) { ws.Cell(r, col).Style.Alignment.WrapText = true; ws.Cell(r, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center; }
-                            r++;
-                        }
-                        ws.Columns().AdjustToContents();
-                        wb.SaveAs(save.FileName);
-                        MessageBox.Show("¡Exportado correctamente!", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                }
-            }
-            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error"); }
-        }
-
-        private void ExportarReporteSemanalConAsistencia()
-        {
-            if (dpMaestro.SelectedDate == null) return;
-            DateTime f = dpMaestro.SelectedDate.Value;
-            int diff = (7 + (f.DayOfWeek - DayOfWeek.Monday)) % 7;
-            DateTime inicioSemana = f.AddDays(-1 * diff).Date;
-            DateTime finSemana = inicioSemana.AddDays(6).Date;
-
-            DataService.CargarAsignaciones();
-            var datos = DataService.Asignaciones.Where(x => x.fecha >= inicioSemana && x.fecha <= finSemana).ToList();
-            if (!datos.Any()) { MessageBox.Show("No hay datos.", "Aviso"); return; }
-
-            try
-            {
-                var save = new SaveFileDialog { Filter = "Excel|*.xlsx", FileName = $"SEMANAL_ASISTENCIA_{DateTime.Now:yyyyMMdd}.xlsx" };
-                if (save.ShowDialog() == true)
+                        // --- DEFINICIÓN DE COLORES POR DÍA ---
+                        // [Color Encabezado, Color Sub-encabezado]
+                        var coloresDias = new List<(XLColor principal, XLColor suave)>
                 {
-                    using (var wb = new XLWorkbook())
-                    {
-                        var ws = wb.Worksheets.Add("Asistencia");
+                    (XLColor.FromHtml("#FCE4D6"), XLColor.FromHtml("#F8CBAD")), // Lunes: Naranja suave
+                    (XLColor.FromHtml("#E2EFDA"), XLColor.FromHtml("#C6E0B4")), // Martes: Verde
+                    (XLColor.FromHtml("#DDEBF7"), XLColor.FromHtml("#BDD7EE")), // Miércoles: Azul
+                    (XLColor.FromHtml("#FFF2CC"), XLColor.FromHtml("#FFE699")), // Jueves: Amarillo
+                    (XLColor.FromHtml("#E1E1E1"), XLColor.FromHtml("#D0CECE")), // Viernes: Gris/Plata
+                    (XLColor.FromHtml("#F2F2F2"), XLColor.FromHtml("#D9D9D9")), // Sábado: Gris claro
+                    (XLColor.FromHtml("#FFD966"), XLColor.FromHtml("#F4B084"))  // Domingo: Oro/Canela
+                };
 
-                        // SEPARADO EN COLUMNAS PARA MEJOR ANÁLISIS
-                        string[] h = { "ID", "EMPLEADO",
-                                       "LUNES (TURNO)", "LUNES (ASISTENCIA)",
-                                       "MARTES (TURNO)", "MARTES (ASISTENCIA)",
-                                       "MIERCOLES (TURNO)", "MIERCOLES (ASISTENCIA)",
-                                       "JUEVES (TURNO)", "JUEVES (ASISTENCIA)",
-                                       "VIERNES (TURNO)", "VIERNES (ASISTENCIA)",
-                                       "SABADO (TURNO)", "SABADO (ASISTENCIA)",
-                                       "DOMINGO (TURNO)", "DOMINGO (ASISTENCIA)" };
+                        var colorEmpleado = XLColor.FromArgb(217, 217, 217); // Gris para la columna nombres
 
-                        for (int i = 0; i < h.Length; i++)
+                        // 1. Configurar la primera columna combinada (Empleados)
+                        var cellEmp = ws.Range(1, 1, 2, 1);
+                        cellEmp.Merge().Value = "NOMBRE DEL\nEMPLEADO";
+                        cellEmp.Style.Alignment.WrapText = true;
+                        cellEmp.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                        cellEmp.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                        cellEmp.Style.Font.Bold = true;
+                        cellEmp.Style.Fill.BackgroundColor = colorEmpleado;
+                        cellEmp.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+
+                        string[] dias = { "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo" };
+                        string[] cabecerasInternas = { "FECHA", "TURNO", "LUGAR", "ESTATUS" };
+
+                        // 2. Generar Cabeceras con colores dinámicos
+                        for (int i = 0; i < 7; i++)
                         {
-                            ws.Cell(1, i + 1).Value = h[i];
-                            ws.Cell(1, i + 1).Style.Font.Bold = true;
-                            ws.Cell(1, i + 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                            int startCol = 2 + (i * 4);
+                            int endCol = startCol + 3;
 
-                            // Color verde para Datos Base
-                            if (i < 2) ws.Cell(1, i + 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#4CAF50");
-                            // Color gris claro para Turnos
-                            else if (i % 2 == 0) ws.Cell(1, i + 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#E0E0E0");
-                            // Color verde claro para Asistencia
-                            else ws.Cell(1, i + 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#C8E6C9");
-                        }
+                            // Seleccionar el par de colores para el día actual
+                            var colorDia = coloresDias[i];
 
-                        int r = 2;
-                        var grupos = datos.GroupBy(x => x.id_empleado);
-                        foreach (var g in grupos)
-                        {
-                            var emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == g.Key);
-                            ws.Cell(r, 1).Value = g.Key;
-                            ws.Cell(r, 2).Value = emp != null ? emp.nombre_completo.ToUpper() : "";
+                            // Encabezado del Día (Fila 1)
+                            var rangoDia = ws.Range(1, startCol, 1, endCol);
+                            rangoDia.Merge().Value = dias[i].ToUpper();
+                            rangoDia.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                            rangoDia.Style.Font.Bold = true;
+                            rangoDia.Style.Fill.BackgroundColor = colorDia.suave; // Color más fuerte
+                            rangoDia.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
 
-                            ws.Cell(r, 3).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Monday);
-                            ws.Cell(r, 4).Value = GetSoloEstatus(g.ToList(), DayOfWeek.Monday);
-
-                            ws.Cell(r, 5).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Tuesday);
-                            ws.Cell(r, 6).Value = GetSoloEstatus(g.ToList(), DayOfWeek.Tuesday);
-
-                            ws.Cell(r, 7).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Wednesday);
-                            ws.Cell(r, 8).Value = GetSoloEstatus(g.ToList(), DayOfWeek.Wednesday);
-
-                            ws.Cell(r, 9).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Thursday);
-                            ws.Cell(r, 10).Value = GetSoloEstatus(g.ToList(), DayOfWeek.Thursday);
-
-                            ws.Cell(r, 11).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Friday);
-                            ws.Cell(r, 12).Value = GetSoloEstatus(g.ToList(), DayOfWeek.Friday);
-
-                            ws.Cell(r, 13).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Saturday);
-                            ws.Cell(r, 14).Value = GetSoloEstatus(g.ToList(), DayOfWeek.Saturday);
-
-                            ws.Cell(r, 15).Value = GetTurnoTextoSemanal(g.ToList(), DayOfWeek.Sunday);
-                            ws.Cell(r, 16).Value = GetSoloEstatus(g.ToList(), DayOfWeek.Sunday);
-
-                            for (int col = 3; col <= 16; col++) { ws.Cell(r, col).Style.Alignment.WrapText = true; ws.Cell(r, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center; }
-                            r++;
-                        }
-                        ws.Columns().AdjustToContents();
-                        wb.SaveAs(save.FileName);
-                        MessageBox.Show("¡Exportado correctamente!", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                }
-            }
-            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error"); }
-        }
-
-        private void ExportarReporteDiario(bool conAsistencia)
-        {
-            if (dpMaestro.SelectedDate == null) return;
-            DateTime diaSeleccionado = dpMaestro.SelectedDate.Value.Date;
-
-            DataService.CargarAsignaciones();
-            var asignacionesDelDia = DataService.Asignaciones.Where(x => x.fecha.Date == diaSeleccionado).ToList();
-
-            if (!asignacionesDelDia.Any()) { MessageBox.Show($"No hay asignaciones para {diaSeleccionado:dd/MM/yyyy}.", "Aviso"); return; }
-
-            try
-            {
-                string suffix = conAsistencia ? "ASISTENCIA" : "BASICO";
-                var save = new SaveFileDialog { Filter = "Excel|*.xlsx", FileName = $"REPORTE_DIARIO_{suffix}_{diaSeleccionado:yyyyMMdd}.xlsx" };
-                if (save.ShowDialog() == true)
-                {
-                    using (var wb = new XLWorkbook())
-                    {
-                        var ws = wb.Worksheets.Add("Reporte Diario");
-
-                        var headers = new List<string> { "ID", "FECHA", "EMPLEADO", "UBICACIÓN", "TURNO" };
-                        if (conAsistencia) headers.Add("ASISTENCIA");
-
-                        for (int i = 0; i < headers.Count; i++)
-                        {
-                            ws.Cell(1, i + 1).Value = headers[i];
-                            ws.Cell(1, i + 1).Style.Font.Bold = true;
-                            ws.Cell(1, i + 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#2196F3");
-                            ws.Cell(1, i + 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                        }
-
-                        int r = 2;
-                        DataService.CargarUbicaciones();
-
-                        foreach (var asig in asignacionesDelDia)
-                        {
-                            var emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == asig.id_empleado);
-                            var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == asig.id_ubicacion);
-
-                            ws.Cell(r, 1).Value = asig.id_empleado;
-                            ws.Cell(r, 2).Value = asig.fecha.ToString("dd/MM/yyyy");
-                            ws.Cell(r, 3).Value = emp != null ? emp.nombre_completo.ToUpper() : "";
-                            ws.Cell(r, 4).Value = ubi?.nombre_lugar?.ToUpper() ?? "SIN UBICACIÓN";
-                            ws.Cell(r, 5).Value = FormatearTurnoDiario(asig).Replace("\n", " - ");
-
-                            if (conAsistencia)
+                            // Sub-encabezados (Fila 2: Fecha, Turno, etc.)
+                            for (int j = 0; j < 4; j++)
                             {
-                                ws.Cell(r, 6).Value = FormatearEstatus(asig);
-                                ws.Cell(r, 6).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                                var cellSub = ws.Cell(2, startCol + j);
+                                cellSub.Value = cabecerasInternas[j];
+                                cellSub.Style.Font.Bold = true;
+                                cellSub.Style.Fill.BackgroundColor = colorDia.principal; // Color más claro
+                                cellSub.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                                cellSub.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
                             }
+                        }
 
+                        // 3. Llenar los datos
+                        int r = 3;
+                        var grupos = datos.GroupBy(x => x.id_empleado);
+                        foreach (var g in grupos)
+                        {
+                            var emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == g.Key);
+                            ws.Cell(r, 1).Value = emp != null ? emp.nombre_completo : "DESCONOCIDO";
+                            ws.Cell(r, 1).Style.Font.Bold = true;
+
+                            for (int i = 0; i < 7; i++)
+                            {
+                                int startCol = 2 + (i * 4);
+                                DateTime currentDay = inicioSemana.AddDays(i);
+                                var asig = g.FirstOrDefault(x => x.fecha.Date == currentDay);
+
+                                if (asig != null)
+                                {
+                                    var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == asig.id_ubicacion);
+
+                                    ws.Cell(r, startCol).Value = asig.fecha.ToString("dd/MM/yyyy");
+                                    ws.Cell(r, startCol + 1).Value = FormatearTurnoDiario(asig);
+                                    ws.Cell(r, startCol + 2).Value = ubi?.nombre_lugar ?? "N/A";
+
+                                    string estatusLimpio = FormatearEstatus(asig).Replace("✅", "").Replace("⏳", "").Replace("🚪", "").Replace("❌", "").Replace("🏖️", "").Replace("💤", "").Trim();
+                                    ws.Cell(r, startCol + 3).Value = estatusLimpio;
+                                }
+                                else
+                                {
+                                    ws.Cell(r, startCol).Value = currentDay.ToString("dd/MM/yyyy");
+                                    ws.Cell(r, startCol + 1).Value = "-";
+                                    ws.Cell(r, startCol + 2).Value = "-";
+                                    ws.Cell(r, startCol + 3).Value = "-";
+                                }
+
+                                // Aplicar color de fondo muy tenue a las celdas de datos para mantener la distinción visual
+                                var dataRowRange = ws.Range(r, startCol, r, startCol + 3);
+                                dataRowRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                                // Opcional: dataRowRange.Style.Fill.BackgroundColor = coloresDias[i].principal; 
+                            }
                             r++;
                         }
+
+                        // 4. Estética final
+                        var dataRange = ws.Range(1, 1, r - 1, 1 + (7 * 4));
+                        dataRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+                        dataRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+
                         ws.Columns().AdjustToContents();
                         wb.SaveAs(save.FileName);
-                        MessageBox.Show("¡Diario exportado!", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show("¡Reporte colorido exportado correctamente!", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
             }
@@ -632,6 +538,16 @@ namespace Secorvi
             public string nombre_completo { get; set; }
         }
 
+        public class FilaVistaPlana
+        {
+            public int IdEmpleado { get; set; }
+            public string Fecha { get; set; }
+            public string NombreEmpleado { get; set; }
+            public string Ubicacion { get; set; }
+            public string Turno { get; set; }
+            public string Estatus { get; set; }
+        }
+
         public class FilaVistaSemanal
         {
             public int IdEmpleado { get; set; }
@@ -643,16 +559,6 @@ namespace Secorvi
             public string Viernes { get; set; }
             public string Sabado { get; set; }
             public string Domingo { get; set; }
-        }
-
-        public class FilaVistaPlana
-        {
-            public int IdEmpleado { get; set; }
-            public string Fecha { get; set; }
-            public string NombreEmpleado { get; set; }
-            public string Ubicacion { get; set; }
-            public string Turno { get; set; }
-            public string Estatus { get; set; }
         }
     }
 }

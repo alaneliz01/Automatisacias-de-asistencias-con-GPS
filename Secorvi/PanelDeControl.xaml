@@ -86,12 +86,11 @@
 
         <Border Grid.Row="0" Padding="0,0,0,20">
             <DockPanel>
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" RenderTransformOrigin="0.603,0.651">
                     <TextBlock Text="GESTIÓN DE AGENTES" Foreground="White" FontSize="20" FontWeight="Black" VerticalAlignment="Center"/>
                     <Rectangle Width="1" Fill="#2D323E" Margin="20,5" Height="25"/>
                     <Button Content="+ REGISTRAR" Click="BtnNuevo_Click" Style="{StaticResource IndustrialButtonStyle}" Background="#FFB300" Foreground="#0F111A" Width="140"/>
-                    <Button Content="🛡️ PERMISOS" Click="BtnRoles_Click" Style="{StaticResource IndustrialButtonStyle}" Margin="10,0" Width="120"/>
-                    <Button Content="✕ DAR DE BAJA" Click="BtnEliminar_Click" Style="{StaticResource IndustrialButtonStyle}" Background="#2D1214" Foreground="#FF5252" BorderBrush="#FF5252" Width="100"/>
+                    <Button Content="✕ DAR DE BAJA" Click="BtnEliminar_Click" Style="{StaticResource IndustrialButtonStyle}" Background="#2D1214" Foreground="#FF5252" BorderBrush="#FF5252" Width="134" Margin="15,0,0,0"/>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -195,17 +194,46 @@
                                             <Setter Property="Background" Value="#1A1F26"/>
                                             <Setter Property="BorderBrush" Value="#2D323E"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="PRESENTE">
+                                                <!-- 1. ASISTENCIA (A tiempo: Verde) -->
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="ASISTENCIA">
                                                     <Setter Property="Background" Value="#0A2D1B"/>
                                                     <Setter Property="BorderBrush" Value="#2ECC71"/>
                                                 </DataTrigger>
+
+                                                <!-- 2. RETRASO (Fuera de tolerancia: Amarillo/Naranja) -->
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="RETRASO">
+                                                    <Setter Property="Background" Value="#2D240A"/>
+                                                    <Setter Property="BorderBrush" Value="#F1C40F"/>
+                                                </DataTrigger>
+
+                                                <!-- 3. FALTA (No llegó: Rojo) -->
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="FALTA">
+                                                    <Setter Property="Background" Value="#2D1214"/>
+                                                    <Setter Property="BorderBrush" Value="#FF5252"/>
+                                                </DataTrigger>
+
+                                                <!-- 4. PROGRAMADO (Futuro: Azul) -->
                                                 <DataTrigger Binding="{Binding estatus_asistencia}" Value="PROGRAMADO">
                                                     <Setter Property="Background" Value="#161920"/>
                                                     <Setter Property="BorderBrush" Value="#3498DB"/>
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="DÍA LIBRE">
+
+                                                <!-- 5. DESCANSO (Día libre: Gris) -->
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="DESCANSO">
                                                     <Setter Property="Background" Value="#1A1F26"/>
                                                     <Setter Property="BorderBrush" Value="#6B7280"/>
+                                                </DataTrigger>
+
+                                                <!-- 6. VACACIONES (Azul claro/Cyan) -->
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="VACACIONES">
+                                                    <Setter Property="Background" Value="#0A2135"/>
+                                                    <Setter Property="BorderBrush" Value="#00D4FF"/>
+                                                </DataTrigger>
+
+                                                <!-- 7. SALIDA (Turno Finalizado: Morado) -->
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="SALIDA">
+                                                    <Setter Property="Background" Value="#1D122D"/>
+                                                    <Setter Property="BorderBrush" Value="#9B59B6"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
