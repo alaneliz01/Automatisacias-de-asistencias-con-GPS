@@ -132,6 +132,40 @@ namespace Secorvi
                 btnGuardarEmpleado.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71"));
             }
         }
+        private void btnEliminarEmpleado_Click(object sender, RoutedEventArgs e)
+        {
+            if (empleadoSeleccionado == null)
+            {
+                MessageBox.Show("Por favor, selecciona un agente primero.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // 1. EL BLOQUEO DE SEGURIDAD VA AQUÍ (Frontend)
+            if (empleadoSeleccionado.id_empleado == 1) // Asumiendo que la propiedad se llama id_empleado
+            {
+                MessageBox.Show("PROTOCOLO DE SEGURIDAD: La cuenta del Director Principal no puede ser eliminada del sistema.", "OPERACIÓN DENEGADA", MessageBoxButton.OK, MessageBoxImage.Stop);
+                return; // Cortamos la ejecución aquí. La ventana de confirmación nunca se abre.
+            }
+
+            // 2. Si pasa el filtro, abrimos tu ventana de confirmación
+            var ventanaConfirmacion = new ConfirmarEliminacion(empleadoSeleccionado.nombre_completo);
+
+            if (ventanaConfirmacion.ShowDialog() == true && ventanaConfirmacion.ResultadoValidacion)
+            {
+                try
+                {
+                    // 3. Ejecutar la eliminación real
+                    // DataService.EliminarEmpleado(empleadoSeleccionado.id_empleado);
+
+                    MessageBox.Show("Agente eliminado correctamente.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
+                    // CargarDatos(); // Refrescar el DataGrid
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error al eliminar: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
 
         private void btnGuardarEmpleado_Click(object sender, RoutedEventArgs e)
         {
@@ -143,9 +177,9 @@ namespace Secorvi
 
             int rolDeseado = cmbEmpRol.SelectedIndex + 1;
 
-            if (empleadoSeleccionado.id_rol == 1 && rolDeseado > 1)
+            if (empleadoSeleccionado.id_empleado == 1 && rolDeseado > 1)
             {
-                MessageBox.Show("PROTOCOLO DE SEGURIDAD: No está permitido degradar la cuenta de un SUPER ADMIN desde esta interfaz.", "OPERACIÓN DENEGADA", MessageBoxButton.OK, MessageBoxImage.Stop);
+                MessageBox.Show("PROTOCOLO DE SEGURIDAD: No está permitido degradar la cuenta del Director Principal (Rommel).", "OPERACIÓN DENEGADA", MessageBoxButton.OK, MessageBoxImage.Stop);
                 cmbEmpRol.SelectedIndex = 0;
                 return;
             }

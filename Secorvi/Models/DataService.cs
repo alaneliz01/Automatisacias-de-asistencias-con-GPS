@@ -20,8 +20,7 @@ namespace Secorvi
     public static class DataService
     {
         // Tu conexión a Docker (Esto está bien)
-        private static string connectionString = "Server=localhost;Port=3307;Database=secorvi_db;Uid=root;Pwd=2037888;SslMode=Disabled;AllowPublicKeyRetrieval=true;";
-        public static List<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
+        private static string connectionString = "Server=svukid.easypanel.host;Port=33060;Database=secorvi-db;Uid=admin;Pwd=admin;SslMode=Disabled;AllowPublicKeyRetrieval=true;"; public static List<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
 
         // 2. Tienes la lista de Asignaciones
         public static List<Asignacion> Asignaciones { get; set; } = new List<Asignacion>();
@@ -166,9 +165,7 @@ namespace Secorvi
                                 nombre_lugar = r["nombre_lugar"].ToString(),
                                 latitud = Convert.ToDecimal(r["latitud"]),
                                 longitud = Convert.ToDecimal(r["longitud"]),
-                                radio_permitido = Convert.ToInt32(r["radio_permitido"]),
-                                hora_inicio_default = r["hora_inicio_default"] != DBNull.Value ? (TimeSpan?)r["hora_inicio_default"] : null,
-                                hora_fin_default = r["hora_fin_default"] != DBNull.Value ? (TimeSpan?)r["hora_fin_default"] : null
+                                radio_permitido = Convert.ToInt32(r["radio_permitido"])
                             });
                         }
                     }
@@ -252,14 +249,14 @@ namespace Secorvi
                 var transaction = conn.BeginTransaction();
                 try
                 {
-                    // Primero borramos los hijos (asistencias)
-                    string queryHijos = "DELETE FROM asistencias WHERE id_asignacion = @id";
+                    // Opcional: Inactivar las asistencias relacionadas en lugar de borrarlas
+                    string queryHijos = "UPDATE asistencias SET estado = 'INACTIVO' WHERE id_asignacion = @id";
                     var cmd1 = new MySqlCommand(queryHijos, conn, transaction);
                     cmd1.Parameters.AddWithValue("@id", idAsignacion);
                     cmd1.ExecuteNonQuery();
 
-                    // Luego borramos el padre (asignacion)
-                    string queryPadre = "DELETE FROM asignaciones WHERE id_asignacion = @id";
+                    // Inactivar la asignación
+                    string queryPadre = "UPDATE asignaciones SET estatus = 'INACTIVO' WHERE id_asignacion = @id";
                     var cmd2 = new MySqlCommand(queryPadre, conn, transaction);
                     cmd2.Parameters.AddWithValue("@id", idAsignacion);
                     cmd2.ExecuteNonQuery();
@@ -345,21 +342,63 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = @"INSERT INTO empleados 
-                        (id_empleado, nombre_completo, telefono, id_rol, estatus, usuario, contrasena, matricula) 
-                        VALUES (@id, @nom, @tel, @rol, 'Activo', @usu, @con, @mat)";
-
-                var cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@id", emp.id_empleado);
-                cmd.Parameters.AddWithValue("@nom", emp.nombre_completo);
-                cmd.Parameters.AddWithValue("@tel", emp.telefono);
-                cmd.Parameters.AddWithValue("@rol", emp.id_rol);
-                cmd.Parameters.AddWithValue("@usu", emp.usuario);
-                cmd.Parameters.AddWithValue("@con", emp.contrasena);
-                cmd.Parameters.AddWithValue("@mat", emp.matricula);
-
                 conn.Open();
-                cmd.ExecuteNonQuery();
+
+                // 1. Verificamos si ya existe el empleado (incluso si está inactivo) buscando por un dato único, como la matrícula
+                string checkQuery = "SELECT id_empleado, estatus FROM empleados WHERE matricula = @mat";
+                int? idExistente = null;
+                string estatusActual = null;
+
+                using (var checkCmd = new MySqlCommand(checkQuery, conn))
+                {
+                    checkCmd.Parameters.AddWithValue("@mat", emp.matricula);
+                    using (var reader = checkCmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            idExistente = Convert.ToInt32(reader["id_empleado"]);
+                            estatusActual = reader["estatus"].ToString();
+                        }
+                    }
+                }
+
+                if (idExistente.HasValue)
+                {
+                    // 2. Si existe, hacemos un UPDATE para reactivarlo y sobreescribir sus nuevos datos
+                    string updateQuery = @"UPDATE empleados 
+                                   SET nombre_completo = @nom, telefono = @tel, id_rol = @rol, 
+                                       estatus = 'Activo', usuario = @usu, contrasena = @con 
+                                   WHERE id_empleado = @id";
+                    using (var updateCmd = new MySqlCommand(updateQuery, conn))
+                    {
+                        updateCmd.Parameters.AddWithValue("@id", idExistente.Value);
+                        updateCmd.Parameters.AddWithValue("@nom", emp.nombre_completo);
+                        updateCmd.Parameters.AddWithValue("@tel", emp.telefono);
+                        updateCmd.Parameters.AddWithValue("@rol", emp.id_rol);
+                        updateCmd.Parameters.AddWithValue("@usu", emp.usuario);
+                        updateCmd.Parameters.AddWithValue("@con", emp.contrasena);
+                        updateCmd.ExecuteNonQuery();
+                    }
+                }
+                else
+                {
+                    // 3. Si no existe, hacemos el INSERT normal
+                    string insertQuery = @"INSERT INTO empleados 
+                    (id_empleado, nombre_completo, telefono, id_rol, estatus, usuario, contrasena, matricula) 
+                    VALUES (@id, @nom, @tel, @rol, 'Activo', @usu, @con, @mat)";
+
+                    using (var insertCmd = new MySqlCommand(insertQuery, conn))
+                    {
+                        insertCmd.Parameters.AddWithValue("@id", ObtenerProximoIdEmpleado()); // Usamos tu método
+                        insertCmd.Parameters.AddWithValue("@nom", emp.nombre_completo);
+                        insertCmd.Parameters.AddWithValue("@tel", emp.telefono);
+                        insertCmd.Parameters.AddWithValue("@rol", emp.id_rol);
+                        insertCmd.Parameters.AddWithValue("@usu", emp.usuario);
+                        insertCmd.Parameters.AddWithValue("@con", emp.contrasena);
+                        insertCmd.Parameters.AddWithValue("@mat", emp.matricula);
+                        insertCmd.ExecuteNonQuery();
+                    }
+                }
             }
             CargarEmpleados();
         }
@@ -370,15 +409,16 @@ namespace Secorvi
             {
                 conn.Open();
 
-
-                string queryAsignaciones = "DELETE FROM asignaciones WHERE id_empleado = @id";
+                // Inactivamos las asignaciones futuras del empleado (Opcional, pero recomendado)
+                string queryAsignaciones = "UPDATE asignaciones SET estatus = 'INACTIVO' WHERE id_empleado = @id AND fecha >= CURDATE()";
                 using (var cmdAsig = new MySqlCommand(queryAsignaciones, conn))
                 {
                     cmdAsig.Parameters.AddWithValue("@id", id);
                     cmdAsig.ExecuteNonQuery();
                 }
 
-                string queryEmpleado = "DELETE FROM empleados WHERE id_empleado = @id";
+                // En lugar de DELETE, actualizamos el estatus
+                string queryEmpleado = "UPDATE empleados SET estatus = 'Inactivo' WHERE id_empleado = @id";
                 using (var cmdEmp = new MySqlCommand(queryEmpleado, conn))
                 {
                     cmdEmp.Parameters.AddWithValue("@id", id);
@@ -410,14 +450,11 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                // Agregamos nombre_lugar y las horas al UPDATE
                 string query = @"UPDATE ubicaciones 
                          SET nombre_lugar = @nom, 
                              latitud = @lat, 
                              longitud = @lng, 
-                             radio_permitido = @rad,
-                             hora_inicio_default = @hinicio,
-                             hora_fin_default = @hfin
+                             radio_permitido = @rad
                          WHERE id_ubicacion = @id";
 
                 var cmd = new MySqlCommand(query, conn);
@@ -425,11 +462,6 @@ namespace Secorvi
                 cmd.Parameters.AddWithValue("@lat", u.latitud);
                 cmd.Parameters.AddWithValue("@lng", u.longitud);
                 cmd.Parameters.AddWithValue("@rad", u.radio_permitido);
-
-                // Validamos si tienen valor o si son nulos
-                cmd.Parameters.AddWithValue("@hinicio", u.hora_inicio_default.HasValue ? (object)u.hora_inicio_default.Value : DBNull.Value);
-                cmd.Parameters.AddWithValue("@hfin", u.hora_fin_default.HasValue ? (object)u.hora_fin_default.Value : DBNull.Value);
-
                 cmd.Parameters.AddWithValue("@id", u.id_ubicacion);
 
                 conn.Open();
@@ -442,10 +474,10 @@ namespace Secorvi
             using (var conn = new MySqlConnection(connectionString))
             {
                 conn.Open();
-                // Agregamos .ToList() aquí también
                 foreach (var ubi in lista.ToList())
                 {
-                    string query = "DELETE FROM ubicaciones WHERE id_ubicacion = @id";
+                    // Cambiamos DELETE por UPDATE
+                    string query = "UPDATE ubicaciones SET estatus = 'Inactivo' WHERE id_ubicacion = @id";
                     using (var cmd = new MySqlCommand(query, conn))
                     {
                         cmd.Parameters.AddWithValue("@id", ubi.id_ubicacion);
@@ -459,21 +491,33 @@ namespace Secorvi
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                // Actualizamos el rol y la contraseña basándonos en el objeto Empleado modificado.
+                // 1. Armamos la consulta dinámica. 
+                // Actualizamos nombre, teléfono, usuario y rol por defecto.
                 string query = @"UPDATE empleados 
-                                 SET id_rol = @rol, 
-                                     contrasena = @con 
-                                 WHERE id_empleado = @id";
+                         SET nombre_completo = @nom, 
+                             telefono = @tel, 
+                             usuario = @usu, 
+                             id_rol = @rol";
+
+                // 2. Solo actualizamos la contraseña si el usuario escribió una nueva
+                if (!string.IsNullOrEmpty(emp.contrasena))
+                {
+                    query += ", contrasena = @con";
+                }
+
+                // 3. Cerramos la consulta con la condición WHERE
+                query += " WHERE id_empleado = @id";
 
                 var cmd = new MySqlCommand(query, conn);
+
+                // Pasamos todos los parámetros nuevos
+                cmd.Parameters.AddWithValue("@nom", emp.nombre_completo);
+                cmd.Parameters.AddWithValue("@tel", emp.telefono);
+                cmd.Parameters.AddWithValue("@usu", emp.usuario);
                 cmd.Parameters.AddWithValue("@rol", emp.id_rol);
                 cmd.Parameters.AddWithValue("@id", emp.id_empleado);
 
-                if (string.IsNullOrEmpty(emp.contrasena))
-                {
-                    cmd.Parameters.AddWithValue("@con", DBNull.Value);
-                }
-                else
+                if (!string.IsNullOrEmpty(emp.contrasena))
                 {
                     cmd.Parameters.AddWithValue("@con", emp.contrasena);
                 }
@@ -485,35 +529,37 @@ namespace Secorvi
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine("Error al actualizar empleado: " + ex.Message);
+                    System.Windows.MessageBox.Show("Error al actualizar empleado: " + ex.Message, "Error BD", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
                 }
             }
 
             // Refrescamos la lista local para mantener todo el sistema sincronizado
             CargarEmpleados();
         }
+
         // --- GESTIÓN DE ASIGNACIONES: ELIMINACIÓN POR FECHA ---
         public static void EliminarAsignacionPorFecha(int idEmpleado, DateTime fecha)
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                // Usamos DATE(@fec) para asegurarnos de comparar solo la fecha sin la hora
-                string query = "DELETE FROM asignaciones WHERE id_empleado = @emp AND DATE(fecha) = DATE(@fec)";
+                // Cambiamos DELETE por UPDATE
+                string query = "UPDATE asignaciones SET estatus = 'INACTIVO' WHERE id_empleado = @emp AND DATE(fecha) = DATE(@fec)";
                 var cmd = new MySqlCommand(query, conn);
                 cmd.Parameters.AddWithValue("@emp", idEmpleado);
                 cmd.Parameters.AddWithValue("@fec", fecha);
 
                 try
-                { SincronizarEstatusVistaJefe();
+                {
                     conn.Open();
                     cmd.ExecuteNonQuery();
+                    SincronizarEstatusVistaJefe();
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine("Error al eliminar asignación: " + ex.Message);
                 }
             }
-            CargarAsignaciones(); // Refrescamos la lista global
+            CargarAsignaciones();
         }
         // --- GESTIÓN DE UBICACIONES: NUEVOS MÉTODOS PARA EL MAPA ---
 
@@ -522,42 +568,37 @@ namespace Secorvi
             int nuevoId = 0;
             using (var conn = new MySqlConnection(connectionString))
             {
-                // Insertamos y pedimos el último ID generado en la misma ejecución
                 string query = @"INSERT INTO ubicaciones (nombre_lugar, latitud, longitud, radio_permitido) 
-                                 VALUES (@nom, @lat, @lng, @rad);
-                                 SELECT LAST_INSERT_ID();";
+                         VALUES (@nom, @lat, @lng, @rad);
+                         SELECT LAST_INSERT_ID();";
 
                 var cmd = new MySqlCommand(query, conn);
                 cmd.Parameters.AddWithValue("@nom", u.nombre_lugar);
                 cmd.Parameters.AddWithValue("@lat", u.latitud);
                 cmd.Parameters.AddWithValue("@lng", u.longitud);
-
-                // Si la ubicación nueva no tiene radio (0), le ponemos 200 por defecto para el mapa
                 cmd.Parameters.AddWithValue("@rad", u.radio_permitido > 0 ? u.radio_permitido : 200);
 
                 try
                 {
                     conn.Open();
-                    // ExecuteScalar ejecuta el query y retorna la primera columna de la primera fila (nuestro ID)
                     nuevoId = Convert.ToInt32(cmd.ExecuteScalar());
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine("Error al crear ubicación desde mapa: " + ex.Message);
-                    throw; // Lanzamos el error para que tu MessageBox en la vista Mapa lo atrape
+                    throw;
                 }
             }
-
-            // Refrescamos la lista global para que aparezca la nueva sugerencia
             CargarUbicaciones();
             return nuevoId;
         }
 
-        public static void EliminarUbicacion(int idUbicacion)
+         public static void EliminarUbicacion(int idUbicacion)
         {
             using (var conn = new MySqlConnection(connectionString))
             {
-                string query = "DELETE FROM ubicaciones WHERE id_ubicacion = @id";
+                // Cambiamos DELETE por UPDATE
+                string query = "UPDATE ubicaciones SET estatus = 'Inactivo' WHERE id_ubicacion = @id";
                 var cmd = new MySqlCommand(query, conn);
                 cmd.Parameters.AddWithValue("@id", idUbicacion);
 
@@ -569,12 +610,10 @@ namespace Secorvi
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine("Error al eliminar ubicación: " + ex.Message);
-                    throw new Exception("No se puede eliminar la ubicación porque probablemente ya esté asignada a un turno.", ex);
+                    throw;
                 }
             }
-
-            // Actualizamos la memoria
             CargarUbicaciones();
         }
-    }
+        }
 }

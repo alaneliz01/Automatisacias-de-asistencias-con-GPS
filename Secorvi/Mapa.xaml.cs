@@ -107,8 +107,7 @@ namespace Secorvi
             var env = await CoreWebView2Environment.CreateAsync(null, cache);
             await mapaWebView.EnsureCoreWebView2Async(env);
 
-            string html = @"
-<!DOCTYPE html>
+            string html = @"<!DOCTYPE html>
 <html>
 <head>
     <meta charset='utf-8'/>
@@ -143,7 +142,6 @@ namespace Secorvi
             border: none !important;
             padding-left: 8px !important;
         }
-
         .leaflet-control-geocoder-alternatives {
             background: white !important;
             color: black !important;
@@ -174,7 +172,8 @@ namespace Secorvi
         let marker;
         let circle; 
 
-        function updatePoint(lat, lng, name, move){ 
+        // 1. Agregamos el parámetro isFromList
+        function updatePoint(lat, lng, name, move, isFromList = false){ 
             if(marker) map.removeLayer(marker); 
             if(circle) map.removeLayer(circle);
 
@@ -188,7 +187,9 @@ namespace Secorvi
             }).addTo(map);
 
             if(move) map.setView([lat, lng], 16); 
-            window.chrome.webview.postMessage({lat:lat, lng:lng, name: name || ''}); 
+            
+            // 2. Enviamos la bandera de vuelta a C#
+            window.chrome.webview.postMessage({lat:lat, lng:lng, name: name || '', isFromList: isFromList}); 
         }
 
         const geocoder = L.Control.geocoder({
@@ -198,12 +199,16 @@ namespace Secorvi
         })
         .on('markgeocode', function(e) {
             var center = e.geocode.center;
-            updatePoint(center.lat, center.lng, e.geocode.name, true);
+            // 3. Geocoder es un punto nuevo (isFromList = false)
+            updatePoint(center.lat, center.lng, e.geocode.name, true, false);
         })
         .addTo(map);
 
-        map.on('click', (e) => updatePoint(e.latlng.lat, e.latlng.lng, '', false)); 
-        window.updatePos = (lat, lng) => updatePoint(lat, lng, '', true);
+        // 4. Click manual es un punto nuevo (isFromList = false)
+        map.on('click', (e) => updatePoint(e.latlng.lat, e.latlng.lng, '', false, false)); 
+        
+        // 5. Carga desde la lista de C# es un punto existente (isFromList = true)
+        window.updatePos = (lat, lng) => updatePoint(lat, lng, '', true, true);
     </script>
 </body>
 </html>";
@@ -238,8 +243,6 @@ namespace Secorvi
 
                 txtCoords.Text = string.Format(CultureInfo.InvariantCulture, "{0:F6}, {1:F6}", _selectedLat, _selectedLng);
                 mapaWebView.ExecuteScriptAsync($"window.updatePos({_selectedLat.ToString(CultureInfo.InvariantCulture)}, {_selectedLng.ToString(CultureInfo.InvariantCulture)})");
-
-                // Sincronizamos los horarios guardados en la base de datos
                 if (u.hora_inicio_default.HasValue)
                     SetPickersFromTimeSpan(u.hora_inicio_default.Value, cbHoraInicio, cbAmPmInicio);
 
@@ -260,26 +263,43 @@ namespace Secorvi
                     return;
                 }
 
-                // Tomamos el nombre que esté escrito en el cuadro de texto (nuestro "Snapshot")
+                // Tomamos el nombre que esté escrito en el cuadro de texto
                 string nombreAsignacion = txtNombrePunto.Text.Trim();
                 if (string.IsNullOrEmpty(nombreAsignacion)) nombreAsignacion = "PUNTO DE VIGILANCIA";
-
-                // 2. Gestión de Ubicación Nueva (Si el usuario marcó el mapa manualmente)
-                if (_idUbicacionSeleccionada == 0)
-                {
-                    var nuevaUbi = new Ubicacion
-                    {
-                        nombre_lugar = nombreAsignacion,
-                        latitud = (decimal)_selectedLat,
-                        longitud = (decimal)_selectedLng
-                    };
-                    _idUbicacionSeleccionada = DataService.CrearUbicacionRetornandoId(nuevaUbi);
-                    RefrescarListaUbicaciones();
-                }
 
                 // Obtener las horas seleccionadas en los relojes
                 TimeSpan inicio = GetTimeSpanFromPickers(cbHoraInicio, cbAmPmInicio);
                 TimeSpan fin = GetTimeSpanFromPickers(cbHoraFin, cbAmPmFin);
+
+                // 2. Gestión de Ubicación (AQUÍ ESTÁ LA CONDICIÓN NUEVA)
+                if (_idUbicacionSeleccionada == 0)
+                {
+                    // Buscamos si ya existe una ubicación con ese mismo nombre en nuestra lista actual
+                    var ubicacionExistente = DataService.Ubicaciones
+                        .FirstOrDefault(u => u.nombre_lugar != null &&
+                                             u.nombre_lugar.Equals(nombreAsignacion, StringComparison.OrdinalIgnoreCase));
+
+                    if (ubicacionExistente != null)
+                    {
+                        // Si ya existe, NO creamos una nueva. Solo reutilizamos su ID.
+                        _idUbicacionSeleccionada = ubicacionExistente.id_ubicacion;
+                    }
+                    else
+                    {
+                        // Si NO existe, entonces procedemos a crearla
+                        var nuevaUbi = new Ubicacion
+                        {
+                            nombre_lugar = nombreAsignacion,
+                            latitud = (decimal)_selectedLat,
+                            longitud = (decimal)_selectedLng,
+                            hora_inicio_default = inicio,
+                            hora_fin_default = fin
+                        };
+
+                        _idUbicacionSeleccionada = DataService.CrearUbicacionRetornandoId(nuevaUbi);
+                        RefrescarListaUbicaciones();
+                    }
+                }
 
                 // 3. Procesar las fechas
                 bool tieneAsignacionHoy = false;
@@ -294,7 +314,7 @@ namespace Secorvi
                     bool esHoy = (fecha.Date == DateTime.Today);
                     if (esHoy) tieneAsignacionHoy = true;
 
-                    // Limpiamos cualquier asignación previa para este empleado en esta fecha específica
+                    
                     DataService.EliminarAsignacionPorFecha(_idEmpleado, fecha);
 
                     var nuevaAsig = new Asignacion

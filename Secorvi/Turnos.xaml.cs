@@ -21,8 +21,6 @@ namespace Secorvi
         private ICollectionView _vistaSemanal;
         private ICollectionView _vistaPlana;
         private string _modoVistaActual = "SEMANAL";
-
-        // Variables de control para evitar ejecuciones múltiples
         private bool _isLoaded = false;
         private bool _isCargando = false;
 
@@ -200,7 +198,7 @@ namespace Secorvi
                 {
                     DataService.CargarAsignaciones();
                     DataService.CargarEmpleados();
-                    DataService.CargarUbicaciones(); // Cargamos ubicaciones globalmente para que ambas vistas las puedan usar
+                    DataService.CargarUbicaciones(); 
 
                     var asignaciones = DataService.Asignaciones
                         .Where(x => x.fecha.Date >= inicio && x.fecha.Date <= fin)
@@ -249,9 +247,7 @@ namespace Secorvi
             }
         }
 
-        // ==========================================
         // TABLA NORMAL (INTERFAZ DE USUARIO XAML)
-        // ==========================================
         private void TablaReportes(List<Asignacion> asignaciones)
         {
             var resultadoSemana = new List<FilaVistaSemanal>();
@@ -284,9 +280,7 @@ namespace Secorvi
             });
         }
 
-        // ==========================================
         // FORMATO PARA LA UI Y LÓGICA DE ESTATUS
-        // ==========================================
         private string GetTurnoTextoSemanal(List<Asignacion> turnos, DayOfWeek dia)
         {
             var t = turnos.FirstOrDefault(x => x.fecha.DayOfWeek == dia);
@@ -368,145 +362,95 @@ namespace Secorvi
             ExportacionReportes();
         }
 
+        // EXPORTACIÓN A EXCEL (ESTILO MATRIZ / SECORVI)
         private void ExportacionReportes()
         {
             if (dpMaestro.SelectedDate == null) return;
             DateTime f = dpMaestro.SelectedDate.Value;
+
+            // Ajustamos el inicio de la semana (Ej. Nómina empezando en Viernes o Lunes)
             int diff = (7 + (f.DayOfWeek - DayOfWeek.Monday)) % 7;
             DateTime inicioSemana = f.AddDays(-1 * diff).Date;
             DateTime finSemana = inicioSemana.AddDays(6).Date;
 
             DataService.CargarAsignaciones();
             DataService.CargarUbicaciones();
-            var datos = DataService.Asignaciones.Where(x => x.fecha >= inicioSemana && x.fecha <= finSemana).ToList();
 
+            // Traemos todos los datos de la semana seleccionada
+            var datos = DataService.Asignaciones.Where(x => x.fecha >= inicioSemana && x.fecha <= finSemana).ToList();
             if (!datos.Any()) { MessageBox.Show("No hay datos en esta semana.", "Aviso"); return; }
 
             try
             {
-                var save = new SaveFileDialog { Filter = "Excel|*.xlsx", FileName = $"REPORTE_SEMANAL_{DateTime.Now:yyyyMMdd}.xlsx" };
+                var save = new SaveFileDialog { Filter = "Excel|*.xlsx", FileName = $"REPORTE_LISTA_{inicioSemana:yyyyMMdd}.xlsx" };
                 if (save.ShowDialog() == true)
                 {
                     using (var wb = new XLWorkbook())
                     {
-                        var ws = wb.Worksheets.Add("Reporte");
+                        var ws = wb.Worksheets.Add("Reporte Diario");
+                        int filaActual = 1;
 
-                        // --- DEFINICIÓN DE COLORES POR DÍA ---
-                        // [Color Encabezado, Color Sub-encabezado]
-                        var coloresDias = new List<(XLColor principal, XLColor suave)>
-                {
-                    (XLColor.FromHtml("#FCE4D6"), XLColor.FromHtml("#F8CBAD")), // Lunes: Naranja suave
-                    (XLColor.FromHtml("#E2EFDA"), XLColor.FromHtml("#C6E0B4")), // Martes: Verde
-                    (XLColor.FromHtml("#DDEBF7"), XLColor.FromHtml("#BDD7EE")), // Miércoles: Azul
-                    (XLColor.FromHtml("#FFF2CC"), XLColor.FromHtml("#FFE699")), // Jueves: Amarillo
-                    (XLColor.FromHtml("#E1E1E1"), XLColor.FromHtml("#D0CECE")), // Viernes: Gris/Plata
-                    (XLColor.FromHtml("#F2F2F2"), XLColor.FromHtml("#D9D9D9")), // Sábado: Gris claro
-                    (XLColor.FromHtml("#FFD966"), XLColor.FromHtml("#F4B084"))  // Domingo: Oro/Canela
-                };
+                        // 1. CABECERAS (Basado en la imagen)
+                        ws.Cell(filaActual, 1).Value = "Nombre del empleado";
+                        ws.Cell(filaActual, 2).Value = "Dia";
+                        ws.Cell(filaActual, 3).Value = "Turno";
+                        ws.Cell(filaActual, 4).Value = "Lugar";
+                        ws.Cell(filaActual, 5).Value = "Estatus";
 
-                        var colorEmpleado = XLColor.FromArgb(217, 217, 217); // Gris para la columna nombres
+                        // Estilo básico para las cabeceras
+                        var rangoCabeceras = ws.Range(filaActual, 1, filaActual, 5);
+                        rangoCabeceras.Style.Font.Bold = true;
+                        rangoCabeceras.SetAutoFilter();
 
-                        // 1. Configurar la primera columna combinada (Empleados)
-                        var cellEmp = ws.Range(1, 1, 2, 1);
-                        cellEmp.Merge().Value = "NOMBRE DEL\nEMPLEADO";
-                        cellEmp.Style.Alignment.WrapText = true;
-                        cellEmp.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                        cellEmp.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-                        cellEmp.Style.Font.Bold = true;
-                        cellEmp.Style.Fill.BackgroundColor = colorEmpleado;
-                        cellEmp.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                        ws.SheetView.FreezeRows(1); // Congelar la primera fila
 
-                        string[] dias = { "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo" };
-                        string[] cabecerasInternas = { "FECHA", "TURNO", "LUGAR", "ESTATUS" };
+                        filaActual++;
 
-                        // 2. Generar Cabeceras con colores dinámicos
-                        for (int i = 0; i < 7; i++)
-                        {
-                            int startCol = 2 + (i * 4);
-                            int endCol = startCol + 3;
-
-                            // Seleccionar el par de colores para el día actual
-                            var colorDia = coloresDias[i];
-
-                            // Encabezado del Día (Fila 1)
-                            var rangoDia = ws.Range(1, startCol, 1, endCol);
-                            rangoDia.Merge().Value = dias[i].ToUpper();
-                            rangoDia.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                            rangoDia.Style.Font.Bold = true;
-                            rangoDia.Style.Fill.BackgroundColor = colorDia.suave; // Color más fuerte
-                            rangoDia.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
-
-                            // Sub-encabezados (Fila 2: Fecha, Turno, etc.)
-                            for (int j = 0; j < 4; j++)
+                        // 2. PREPARAR DATOS 
+                        var listadoPlano = datos
+                            .Select(d => new
                             {
-                                var cellSub = ws.Cell(2, startCol + j);
-                                cellSub.Value = cabecerasInternas[j];
-                                cellSub.Style.Font.Bold = true;
-                                cellSub.Style.Fill.BackgroundColor = colorDia.principal; // Color más claro
-                                cellSub.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                                cellSub.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
-                            }
+                                Asignacion = d,
+                                Emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == d.id_empleado),
+                                Ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == d.id_ubicacion)
+                            })
+                            .OrderBy(x => x.Emp?.nombre_completo)
+                            .ThenBy(x => x.Asignacion.fecha)
+                            .ToList();
+
+                        // 3. LLENADO DE LA LISTA
+                        foreach (var item in listadoPlano)
+                        {
+                            ws.Cell(filaActual, 1).Value = item.Emp?.nombre_completo ?? "N/A";
+                            ws.Cell(filaActual, 2).Value = item.Asignacion.fecha.ToString("dd/MM/yyyy");
+                            ws.Cell(filaActual, 3).Value = FormatearTurnoDiario(item.Asignacion); 
+                            ws.Cell(filaActual, 4).Value = item.Ubi?.nombre_lugar ?? "SIN ASIGNAR";
+                            ws.Cell(filaActual, 5).Value = FormatearEstatus(item.Asignacion);
+
+                            // Bordes simples
+                            ws.Range(filaActual, 1, filaActual, 5).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                            ws.Range(filaActual, 1, filaActual, 5).Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+
+                            filaActual++;
                         }
 
-                        // 3. Llenar los datos
-                        int r = 3;
-                        var grupos = datos.GroupBy(x => x.id_empleado);
-                        foreach (var g in grupos)
-                        {
-                            var emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == g.Key);
-                            ws.Cell(r, 1).Value = emp != null ? emp.nombre_completo : "DESCONOCIDO";
-                            ws.Cell(r, 1).Style.Font.Bold = true;
-
-                            for (int i = 0; i < 7; i++)
-                            {
-                                int startCol = 2 + (i * 4);
-                                DateTime currentDay = inicioSemana.AddDays(i);
-                                var asig = g.FirstOrDefault(x => x.fecha.Date == currentDay);
-
-                                if (asig != null)
-                                {
-                                    var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == asig.id_ubicacion);
-
-                                    ws.Cell(r, startCol).Value = asig.fecha.ToString("dd/MM/yyyy");
-                                    ws.Cell(r, startCol + 1).Value = FormatearTurnoDiario(asig);
-                                    ws.Cell(r, startCol + 2).Value = ubi?.nombre_lugar ?? "N/A";
-
-                                    string estatusLimpio = FormatearEstatus(asig).Replace("✅", "").Replace("⏳", "").Replace("🚪", "").Replace("❌", "").Replace("🏖️", "").Replace("💤", "").Trim();
-                                    ws.Cell(r, startCol + 3).Value = estatusLimpio;
-                                }
-                                else
-                                {
-                                    ws.Cell(r, startCol).Value = currentDay.ToString("dd/MM/yyyy");
-                                    ws.Cell(r, startCol + 1).Value = "-";
-                                    ws.Cell(r, startCol + 2).Value = "-";
-                                    ws.Cell(r, startCol + 3).Value = "-";
-                                }
-
-                                // Aplicar color de fondo muy tenue a las celdas de datos para mantener la distinción visual
-                                var dataRowRange = ws.Range(r, startCol, r, startCol + 3);
-                                dataRowRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                                // Opcional: dataRowRange.Style.Fill.BackgroundColor = coloresDias[i].principal; 
-                            }
-                            r++;
-                        }
-
-                        // 4. Estética final
-                        var dataRange = ws.Range(1, 1, r - 1, 1 + (7 * 4));
-                        dataRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
-                        dataRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
-
+                        // 4. AJUSTE DE TAMAÑOS
                         ws.Columns().AdjustToContents();
+                        ws.Column(1).Width = 35; 
+                        ws.Column(4).Width = 25; 
+
                         wb.SaveAs(save.FileName);
-                        MessageBox.Show("¡Reporte colorido exportado correctamente!", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show("Reporte exportado con éxito.", "Excelente", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
             }
-            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error"); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al exportar: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
-        // ==========================================
         // NAVEGADOR INTELIGENTE (FILTRO EN VIVO)
-        // ==========================================
         private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
         {
             _vistaSemanal?.Refresh();

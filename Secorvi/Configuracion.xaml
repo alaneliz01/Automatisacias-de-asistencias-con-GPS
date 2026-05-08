@@ -217,6 +217,7 @@
 
                     <!-- PANEL LATERAL DE EDICIÓN -->
                     <Border Grid.Column="1" Background="#0F111A" CornerRadius="4" BorderBrush="#2D323E" BorderThickness="1" Padding="20">
+
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="DATOS DEL AGENTE" Foreground="#00D4FF" FontSize="13" FontWeight="Black" Margin="0,0,0,15"/>
@@ -251,6 +252,9 @@
                                 </Border>
 
                                 <Button x:Name="btnGuardarEmpleado" Content="GUARDAR CAMBIOS" Background="#2ECC71" Foreground="#0F111A" Padding="0,12" Margin="0,10,0,0" Click="btnGuardarEmpleado_Click"/>
+
+                                <!-- BOTÓN DE ELIMINAR AGREGADO AQUÍ -->
+                                <Button x:Name="btnEliminarEmpleado" Content="ELIMINAR AGENTE" Background="#2D1214" Foreground="#FF5252" BorderBrush="#FF5252" BorderThickness="1" Padding="0,10" Margin="0,10,0,0" Click="btnEliminarEmpleado_Click"/>
                             </StackPanel>
                         </ScrollViewer>
                     </Border>
