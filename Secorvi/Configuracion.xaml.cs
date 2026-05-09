@@ -101,7 +101,9 @@ namespace Secorvi
                 txtEmpNombre.Text = emp.nombre_completo;
                 txtEmpTelefono.Text = emp.telefono;
                 txtEmpUsuario.Text = emp.usuario;
-                txtEmpPassword.Text = "";
+
+                // Cargar la contraseña actual en lugar de dejar el campo vacío
+                txtEmpPassword.Text = emp.contrasena;
 
                 if (emp.id_rol == 1) cmbEmpRol.SelectedIndex = 0;
                 else if (emp.id_rol == 2) cmbEmpRol.SelectedIndex = 1;

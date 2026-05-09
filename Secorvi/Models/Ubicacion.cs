@@ -11,5 +11,6 @@ namespace Secorvi.Models
         public int radio_permitido { get; set; }
         public TimeSpan? hora_inicio_default { get; set; }
         public TimeSpan? hora_fin_default { get; set; }
+        public string estatus { get; set; }
     }
 }

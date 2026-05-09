@@ -344,7 +344,6 @@ namespace Secorvi
             {
                 conn.Open();
 
-                // 1. Verificamos si ya existe el empleado (incluso si está inactivo) buscando por un dato único, como la matrícula
                 string checkQuery = "SELECT id_empleado, estatus FROM empleados WHERE matricula = @mat";
                 int? idExistente = null;
                 string estatusActual = null;
@@ -533,7 +532,6 @@ namespace Secorvi
                 }
             }
 
-            // Refrescamos la lista local para mantener todo el sistema sincronizado
             CargarEmpleados();
         }
 

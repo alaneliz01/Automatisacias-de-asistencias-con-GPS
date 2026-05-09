@@ -231,7 +231,7 @@
                                 <TextBlock Text="USUARIO" Style="{StaticResource LblStyle}"/>
                                 <TextBox x:Name="txtEmpUsuario"/>
 
-                                <TextBlock Text="NUEVA CONTRASEÑA" Style="{StaticResource LblStyle}"/>
+                                <TextBlock Text="CONTRASEÑA" Style="{StaticResource LblStyle}"/>
                                 <TextBox x:Name="txtEmpPassword"/>
 
                                 <TextBlock Text="RANGO" Style="{StaticResource LblStyle}"/>

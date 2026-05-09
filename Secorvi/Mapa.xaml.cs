@@ -17,6 +17,7 @@ namespace Secorvi
         private int _idEmpleado;
         private int _idUbicacionSeleccionada = 0; 
         private List<DateTime> _fechasDestino;
+       
 
         public Mapa(int idEmpleado, List<DateTime> fechas)
         {
@@ -49,7 +50,7 @@ namespace Secorvi
         {
             if (lstUbicaciones.SelectedItem is Ubicacion u)
             {
-                var resultado = MessageBox.Show($"¿Estás seguro de que deseas eliminar la ubicación '{u.nombre_lugar}'?",
+                var resultado = MessageBox.Show($"¿Estás seguro de que deseas ocultar la ubicación '{u.nombre_lugar}'?\n\n(Podrás restaurarla después si intentas guardarla de nuevo con el mismo nombre).",
                                                 "Confirmar Eliminación",
                                                 MessageBoxButton.YesNo,
                                                 MessageBoxImage.Warning);
@@ -58,9 +59,10 @@ namespace Secorvi
                 {
                     try
                     {
+                        // Tu DataService ya hace el UPDATE estatus = 'Inactivo' aquí:
                         DataService.EliminarUbicacion(u.id_ubicacion);
 
-                        MessageBox.Show("Ubicación eliminada correctamente.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show("Ubicación eliminada (oculta) correctamente.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
 
                         if (_idUbicacionSeleccionada == u.id_ubicacion)
                         {
@@ -97,7 +99,9 @@ namespace Secorvi
 
         private void RefrescarListaUbicaciones()
         {
-            lstUbicaciones.ItemsSource = DataService.Ubicaciones.OrderBy(u => u.nombre_lugar).ToList();
+            lstUbicaciones.ItemsSource = DataService.Ubicaciones
+                .Where(u => u.estatus != "Inactivo")
+                .OrderBy(u => u.nombre_lugar).ToList();
         }
 
         // --- APARTADO DE MAPA ---
@@ -271,29 +275,56 @@ namespace Secorvi
                 TimeSpan inicio = GetTimeSpanFromPickers(cbHoraInicio, cbAmPmInicio);
                 TimeSpan fin = GetTimeSpanFromPickers(cbHoraFin, cbAmPmFin);
 
-                // 2. Gestión de Ubicación (AQUÍ ESTÁ LA CONDICIÓN NUEVA)
+                // 2. Gestión de Ubicación (LÓGICA DE RESTAURACIÓN AÑADIDA)
                 if (_idUbicacionSeleccionada == 0)
                 {
-                    // Buscamos si ya existe una ubicación con ese mismo nombre en nuestra lista actual
+                    // Buscamos si ya existe (activa o inactiva)
                     var ubicacionExistente = DataService.Ubicaciones
                         .FirstOrDefault(u => u.nombre_lugar != null &&
                                              u.nombre_lugar.Equals(nombreAsignacion, StringComparison.OrdinalIgnoreCase));
 
                     if (ubicacionExistente != null)
                     {
-                        // Si ya existe, NO creamos una nueva. Solo reutilizamos su ID.
-                        _idUbicacionSeleccionada = ubicacionExistente.id_ubicacion;
+                        if (ubicacionExistente.estatus == "Inactivo")
+                        {
+                            var respuesta = MessageBox.Show($"La zona '{nombreAsignacion}' fue eliminada anteriormente del sistema.\n\n¿Deseas restaurarla y actualizarla con las nuevas coordenadas y horarios?",
+                                                            "UBICACIÓN ENCONTRADA", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                            if (respuesta == MessageBoxResult.Yes)
+                            {
+                                // Restauramos la ubicación y le actualizamos los nuevos datos del mapa
+                                ubicacionExistente.estatus = "Activo";
+                                ubicacionExistente.latitud = (decimal)_selectedLat;
+                                ubicacionExistente.longitud = (decimal)_selectedLng;
+                                ubicacionExistente.hora_inicio_default = inicio;
+                                ubicacionExistente.hora_fin_default = fin;
+
+                                DataService.ActualizarUbicacion(ubicacionExistente);
+                                _idUbicacionSeleccionada = ubicacionExistente.id_ubicacion;
+                                RefrescarListaUbicaciones();
+                            }
+                            else
+                            {
+                                return; // Cortamos el proceso si no quiere restaurarla
+                            }
+                        }
+                        else
+                        {
+                            // Si ya existe y está ACTIVA, NO creamos una nueva. Solo reutilizamos su ID.
+                            _idUbicacionSeleccionada = ubicacionExistente.id_ubicacion;
+                        }
                     }
                     else
                     {
-                        // Si NO existe, entonces procedemos a crearla
+                        // Si NO existe en absoluto, procedemos a crearla
                         var nuevaUbi = new Ubicacion
                         {
                             nombre_lugar = nombreAsignacion,
                             latitud = (decimal)_selectedLat,
                             longitud = (decimal)_selectedLng,
                             hora_inicio_default = inicio,
-                            hora_fin_default = fin
+                            hora_fin_default = fin,
+                            estatus = "Activo" // Nos aseguramos de mandarla como Activa
                         };
 
                         _idUbicacionSeleccionada = DataService.CrearUbicacionRetornandoId(nuevaUbi);
@@ -369,7 +400,7 @@ namespace Secorvi
             else
             {
                 var ubicacionesFiltradas = DataService.Ubicaciones
-                    .Where(u => u.nombre_lugar != null && u.nombre_lugar.ToLower().Contains(filtro))
+                    .Where(u => u.estatus != "Inactivo" && u.nombre_lugar != null && u.nombre_lugar.ToLower().Contains(filtro))
                     .OrderBy(u => u.nombre_lugar)
                     .ToList();
 
