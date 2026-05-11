@@ -315,7 +315,7 @@ namespace Secorvi
                 var transaction = conn.BeginTransaction();
                 try
                 {
-                    string queryHijos = "UPDATE asistencias SET estatus = 'En proceso' WHERE id_asignacion = @id";
+                    string queryHijos = "UPDATE asistencias SET estatus = 'Asistencia en curso' WHERE id_asignacion = @id";
                     var cmd1 = new MySqlCommand(queryHijos, conn, transaction);
                     cmd1.Parameters.AddWithValue("@id", idAsignacion);
                     cmd1.ExecuteNonQuery();

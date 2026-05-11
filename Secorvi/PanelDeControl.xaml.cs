@@ -51,6 +51,11 @@ namespace Secorvi
         private string EvaluarEstadoApp(Asignacion t)
         {
             string estatusDB = t.estatus?.Trim().ToUpper() ?? "";
+
+            // Homologar estatus crudos al estándar de la aplicación
+            if (estatusDB == "ACTIVO" || estatusDB == "ENTRADA") estatusDB = "ASISTENCIA EN CURSO";
+            if (estatusDB == "COMPLETADO" || estatusDB == "ASISTIÓ") estatusDB = "ASISTENCIA COMPLETADA";
+
             DateTime ahora = DateTime.Now;
             DateTime inicioAsignacion = t.fecha.Date.Add(t.hora_inicio);
             DateTime finAsignacion = t.fecha.Date.Add(t.hora_fin);
@@ -71,12 +76,13 @@ namespace Secorvi
                 return "No se marco asistencia";
             }
 
-            if (!string.IsNullOrEmpty(t.estatus))
+            // Retornar estatusDB capitalizado en lugar de t.estatus crudo
+            if (!string.IsNullOrEmpty(estatusDB))
             {
-                if (t.estatus.Length > 1)
-                    return char.ToUpper(t.estatus[0]) + t.estatus.Substring(1).ToLower();
+                if (estatusDB.Length > 1)
+                    return char.ToUpper(estatusDB[0]) + estatusDB.Substring(1).ToLower();
 
-                return t.estatus;
+                return estatusDB;
             }
 
             return "Desconocido";
