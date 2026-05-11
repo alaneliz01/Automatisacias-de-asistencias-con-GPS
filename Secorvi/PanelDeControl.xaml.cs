@@ -8,7 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Threading;
-
+//fin de todo
 namespace Secorvi
 {
     public partial class PanelDeControl : Page
