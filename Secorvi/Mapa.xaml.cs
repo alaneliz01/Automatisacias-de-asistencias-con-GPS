@@ -15,9 +15,8 @@ namespace Secorvi
     {
         private double _selectedLat = 0, _selectedLng = 0;
         private int _idEmpleado;
-        private int _idUbicacionSeleccionada = 0; 
+        private int _idUbicacionSeleccionada = 0;
         private List<DateTime> _fechasDestino;
-       
 
         public Mapa(int idEmpleado, List<DateTime> fechas)
         {
@@ -39,7 +38,7 @@ namespace Secorvi
         private void ConfigurarMenuContextualUbicaciones()
         {
             var menuContextual = new ContextMenu();
-            var menuEliminar = new MenuItem { Header = "Eliminar Ubicación" };
+            var menuEliminar = new MenuItem { Header = "Ocultar / Inactivar Ubicación" };
             menuEliminar.Click += MenuEliminar_Click;
             menuContextual.Items.Add(menuEliminar);
 
@@ -50,8 +49,8 @@ namespace Secorvi
         {
             if (lstUbicaciones.SelectedItem is Ubicacion u)
             {
-                var resultado = MessageBox.Show($"¿Estás seguro de que deseas ocultar la ubicación '{u.nombre_lugar}'?\n\n(Podrás restaurarla después si intentas guardarla de nuevo con el mismo nombre).",
-                                                "Confirmar Eliminación",
+                var resultado = MessageBox.Show($"¿Estás seguro de que deseas ocultar la ubicación '{u.nombre_lugar}'?\n\n(Podrás restaurarla después desde la configuración o si intentas crearla de nuevo).",
+                                                "Confirmar Inactivación",
                                                 MessageBoxButton.YesNo,
                                                 MessageBoxImage.Warning);
 
@@ -59,10 +58,10 @@ namespace Secorvi
                 {
                     try
                     {
-                        // Tu DataService ya hace el UPDATE estatus = 'Inactivo' aquí:
+                        // Hace el UPDATE renombrando con [INACTIVA]
                         DataService.EliminarUbicacion(u.id_ubicacion);
 
-                        MessageBox.Show("Ubicación eliminada (oculta) correctamente.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show("Ubicación inactivada (oculta) correctamente.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
 
                         if (_idUbicacionSeleccionada == u.id_ubicacion)
                         {
@@ -74,7 +73,7 @@ namespace Secorvi
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show("Error al eliminar la ubicación: " + ex.Message, "Error");
+                        MessageBox.Show("Error al inactivar la ubicación: " + ex.Message, "Error");
                     }
                 }
             }
@@ -100,8 +99,10 @@ namespace Secorvi
         private void RefrescarListaUbicaciones()
         {
             lstUbicaciones.ItemsSource = DataService.Ubicaciones
-                .Where(u => u.estatus != "Inactivo")
-                .OrderBy(u => u.nombre_lugar).ToList();
+                .GroupBy(u => u.nombre_lugar)
+                .Select(g => g.OrderByDescending(u => u.id_ubicacion).First())
+                .OrderBy(u => u.nombre_lugar)
+                .ToList();
         }
 
         // --- APARTADO DE MAPA ---
@@ -223,13 +224,21 @@ namespace Secorvi
                 _selectedLat = doc.RootElement.GetProperty("lat").GetDouble();
                 _selectedLng = doc.RootElement.GetProperty("lng").GetDouble();
 
-                // Al tocar el mapa, reiniciamos el ID para saber que es un punto nuevo
-                _idUbicacionSeleccionada = 0;
-
-                if (doc.RootElement.TryGetProperty("name", out var nameProp))
+                bool isFromList = false;
+                if (doc.RootElement.TryGetProperty("isFromList", out var isFromListProp))
                 {
-                    string name = nameProp.GetString();
-                    if (!string.IsNullOrEmpty(name)) txtNombrePunto.Text = name.ToUpper();
+                    isFromList = isFromListProp.GetBoolean();
+                }
+
+                if (!isFromList)
+                {
+                    _idUbicacionSeleccionada = 0;
+
+                    if (doc.RootElement.TryGetProperty("name", out var nameProp))
+                    {
+                        string name = nameProp.GetString();
+                        if (!string.IsNullOrEmpty(name)) txtNombrePunto.Text = name.ToUpper();
+                    }
                 }
 
                 txtCoords.Text = string.Format(CultureInfo.InvariantCulture, "{0:F6}, {1:F6}", _selectedLat, _selectedLng);
@@ -254,82 +263,46 @@ namespace Secorvi
                     SetPickersFromTimeSpan(u.hora_fin_default.Value, cbHoraFin, cbAmPmFin);
             }
         }
-        // --- LÓGICA DE ASIGNACIÓN ---
 
+        // --- LÓGICA DE ASIGNACIÓN ---
         private void BtnGuardar_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // 1. Validación de seguridad: Asegurarse de tener una ubicación
+                // 1. Validación de seguridad
                 if (_idUbicacionSeleccionada == 0 && (_selectedLat == 0 || _selectedLng == 0))
                 {
                     MessageBox.Show("SISTEMA: Por favor, selecciona una ubicación de la lista o marca un punto en el mapa para continuar.", "AVISO");
                     return;
                 }
 
-                // Tomamos el nombre que esté escrito en el cuadro de texto
                 string nombreAsignacion = txtNombrePunto.Text.Trim();
                 if (string.IsNullOrEmpty(nombreAsignacion)) nombreAsignacion = "PUNTO DE VIGILANCIA";
 
-                // Obtener las horas seleccionadas en los relojes
                 TimeSpan inicio = GetTimeSpanFromPickers(cbHoraInicio, cbAmPmInicio);
                 TimeSpan fin = GetTimeSpanFromPickers(cbHoraFin, cbAmPmFin);
 
-                // 2. Gestión de Ubicación (LÓGICA DE RESTAURACIÓN AÑADIDA)
+                // 2. Creación inteligente (Dejamos que DataService pregunte si hay inactivas)
                 if (_idUbicacionSeleccionada == 0)
                 {
-                    // Buscamos si ya existe (activa o inactiva)
-                    var ubicacionExistente = DataService.Ubicaciones
-                        .FirstOrDefault(u => u.nombre_lugar != null &&
-                                             u.nombre_lugar.Equals(nombreAsignacion, StringComparison.OrdinalIgnoreCase));
-
-                    if (ubicacionExistente != null)
+                    var nuevaUbi = new Ubicacion
                     {
-                        if (ubicacionExistente.estatus == "Inactivo")
-                        {
-                            var respuesta = MessageBox.Show($"La zona '{nombreAsignacion}' fue eliminada anteriormente del sistema.\n\n¿Deseas restaurarla y actualizarla con las nuevas coordenadas y horarios?",
-                                                            "UBICACIÓN ENCONTRADA", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                        nombre_lugar = nombreAsignacion,
+                        latitud = (decimal)_selectedLat,
+                        longitud = (decimal)_selectedLng,
+                        hora_inicio_default = inicio,
+                        hora_fin_default = fin
+                    };
 
-                            if (respuesta == MessageBoxResult.Yes)
-                            {
-                                // Restauramos la ubicación y le actualizamos los nuevos datos del mapa
-                                ubicacionExistente.estatus = "Activo";
-                                ubicacionExistente.latitud = (decimal)_selectedLat;
-                                ubicacionExistente.longitud = (decimal)_selectedLng;
-                                ubicacionExistente.hora_inicio_default = inicio;
-                                ubicacionExistente.hora_fin_default = fin;
+                    // Si hay un duplicado o el usuario rechaza restaurar, el método devuelve 0
+                    _idUbicacionSeleccionada = DataService.CrearUbicacionRetornandoId(nuevaUbi);
 
-                                DataService.ActualizarUbicacion(ubicacionExistente);
-                                _idUbicacionSeleccionada = ubicacionExistente.id_ubicacion;
-                                RefrescarListaUbicaciones();
-                            }
-                            else
-                            {
-                                return; // Cortamos el proceso si no quiere restaurarla
-                            }
-                        }
-                        else
-                        {
-                            // Si ya existe y está ACTIVA, NO creamos una nueva. Solo reutilizamos su ID.
-                            _idUbicacionSeleccionada = ubicacionExistente.id_ubicacion;
-                        }
-                    }
-                    else
+                    if (_idUbicacionSeleccionada == 0)
                     {
-                        // Si NO existe en absoluto, procedemos a crearla
-                        var nuevaUbi = new Ubicacion
-                        {
-                            nombre_lugar = nombreAsignacion,
-                            latitud = (decimal)_selectedLat,
-                            longitud = (decimal)_selectedLng,
-                            hora_inicio_default = inicio,
-                            hora_fin_default = fin,
-                            estatus = "Activo" // Nos aseguramos de mandarla como Activa
-                        };
-
-                        _idUbicacionSeleccionada = DataService.CrearUbicacionRetornandoId(nuevaUbi);
-                        RefrescarListaUbicaciones();
+                        return; // Cortamos el flujo para no generar asignaciones corruptas
                     }
+
+                    RefrescarListaUbicaciones();
                 }
 
                 // 3. Procesar las fechas
@@ -345,7 +318,6 @@ namespace Secorvi
                     bool esHoy = (fecha.Date == DateTime.Today);
                     if (esHoy) tieneAsignacionHoy = true;
 
-                    
                     DataService.EliminarAsignacionPorFecha(_idEmpleado, fecha);
 
                     var nuevaAsig = new Asignacion
@@ -364,8 +336,8 @@ namespace Secorvi
 
                 // 4. Mensajes dinámicos e inteligentes
                 string tituloPanel = tieneAsignacionHoy ? "OPERACIÓN ACTIVADA" : "CALENDARIO ACTUALIZADO";
-
                 string mensajeDetalle;
+
                 if (tieneAsignacionHoy && _fechasDestino.Count > 1)
                 {
                     mensajeDetalle = $"Se ha ACTIVADO el turno de hoy y se programaron {_fechasDestino.Count - 1} días adicionales correctamente.";
@@ -381,7 +353,6 @@ namespace Secorvi
 
                 MessageBox.Show(mensajeDetalle, tituloPanel, MessageBoxButton.OK, MessageBoxImage.Information);
 
-                // Volver a la pantalla anterior (Calendario/Panel Principal)
                 this.NavigationService?.GoBack();
             }
             catch (Exception ex)
@@ -389,6 +360,7 @@ namespace Secorvi
                 MessageBox.Show("ERROR CRÍTICO AL GUARDAR: " + ex.Message, "SISTEMA FALLIDO", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
         private void txtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
         {
             string filtro = txtBusqueda.Text.Trim().ToLower();
@@ -400,13 +372,16 @@ namespace Secorvi
             else
             {
                 var ubicacionesFiltradas = DataService.Ubicaciones
-                    .Where(u => u.estatus != "Inactivo" && u.nombre_lugar != null && u.nombre_lugar.ToLower().Contains(filtro))
+                    .Where(u => u.nombre_lugar != null && u.nombre_lugar.ToLower().Contains(filtro))
+                    .GroupBy(u => u.nombre_lugar)
+                    .Select(g => g.OrderByDescending(u => u.id_ubicacion).First())
                     .OrderBy(u => u.nombre_lugar)
                     .ToList();
 
                 lstUbicaciones.ItemsSource = ubicacionesFiltradas;
             }
         }
+
         private TimeSpan GetTimeSpanFromPickers(ComboBox cbHora, ComboBox cbAmPm)
         {
             if (string.IsNullOrEmpty(cbHora.Text)) return TimeSpan.Zero;
@@ -453,9 +428,11 @@ namespace Secorvi
                 }
             }
         }
+
         private void BtnTurno8_Click(object sender, RoutedEventArgs e) => AplicarPreajuste(8);
         private void BtnTurno12_Click(object sender, RoutedEventArgs e) => AplicarPreajuste(12);
         private void BtnTurno24_Click(object sender, RoutedEventArgs e) => AplicarPreajuste(24);
+
         private void AplicarPreajuste(int h)
         {
             TimeSpan inicio = GetTimeSpanFromPickers(cbHoraInicio, cbAmPmInicio);

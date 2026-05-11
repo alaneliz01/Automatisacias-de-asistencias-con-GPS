@@ -1,80 +1,51 @@
 ﻿using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 
 namespace Secorvi
 {
     public partial class ConfirmarEliminacion : Window
     {
-        private readonly string _nombreEsperado;
-        public bool ResultadoValidacion { get; private set; }
+        public bool ResultadoValidacion { get; private set; } = false;
+        private string nombreEsperado;
 
-        public ConfirmarEliminacion(string nombreEmpleado)
+        public ConfirmarEliminacion(string nombreAgente)
         {
             InitializeComponent();
+            nombreEsperado = nombreAgente;
+            lblNombreAgente.Text = nombreEsperado;
 
-            _nombreEsperado = nombreEmpleado ?? "";
-            ResultadoValidacion = false;
-
-            // Texto UI
-            lblInstruccion.Text = "Para eliminar, escriba el nombre completo del agente:";
-            lblNombreAgente.Text = _nombreEsperado;
-
-            // Estado inicial seguro
-            btnEliminar.IsEnabled = false;
-            btnEliminar.Opacity = 0.5;
-
-            txtNombreConfirmar.BorderBrush = Brushes.Gray;
+            // Pone el cursor automáticamente en la caja de texto
+            txtNombreConfirmar.Focus();
         }
 
         private void TxtNombreConfirmar_TextChanged(object sender, TextChangedEventArgs e)
         {
-            ValidarEntrada();
-        }
-
-        private void ValidarEntrada()
-        {
-            string input = txtNombreConfirmar.Text?.Trim() ?? "";
-
-            bool coinciden = input.Equals(_nombreEsperado, StringComparison.OrdinalIgnoreCase);
-
-            btnEliminar.IsEnabled = coinciden;
-            btnEliminar.Opacity = coinciden ? 1.0 : 0.5;
-
-            // Feedback visual
-            if (string.IsNullOrWhiteSpace(input))
-                txtNombreConfirmar.BorderBrush = Brushes.Gray;
+            // Compara el texto ignorando mayúsculas y minúsculas
+            if (string.Equals(txtNombreConfirmar.Text.Trim(), nombreEsperado.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                btnEliminar.IsEnabled = true;
+                btnEliminar.Opacity = 1;
+            }
             else
-                txtNombreConfirmar.BorderBrush = coinciden ? Brushes.Green : Brushes.Red;
+            {
+                btnEliminar.IsEnabled = false;
+                btnEliminar.Opacity = 0.5;
+            }
         }
 
         private void BtnEliminar_Click(object sender, RoutedEventArgs e)
         {
-            string input = txtNombreConfirmar.Text?.Trim() ?? "";
-
-            if (input.Equals(_nombreEsperado, StringComparison.OrdinalIgnoreCase))
-            {
-                ResultadoValidacion = true;
-                DialogResult = true;
-                Close();
-            }
-            else
-            {
-                MessageBox.Show(
-                    "El nombre no coincide exactamente.",
-                    "Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning
-                );
-            }
+            ResultadoValidacion = true;
+            this.DialogResult = true;
+            this.Close();
         }
 
         private void BtnCancelar_Click(object sender, RoutedEventArgs e)
         {
             ResultadoValidacion = false;
-            DialogResult = false;
-            Close();
+            this.DialogResult = false;
+            this.Close();
         }
     }
 }

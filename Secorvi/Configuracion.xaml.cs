@@ -1,7 +1,7 @@
 ﻿using Secorvi.Models;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel; // REQUERIDO PARA ICollectionView
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -12,12 +12,20 @@ namespace Secorvi
 {
     public partial class Configuracion : Page
     {
+        // Variables para selección activa
         private Empleado? empleadoSeleccionado;
         private Ubicacion? ubicacionSeleccionada;
 
-        // Variable para gestionar el filtrado en el DataGrid
+        // Variables para selección inactiva
+        private Empleado? empleadoInactivoSeleccionado;
+        private Ubicacion? ubicacionInactivaSeleccionada;
+
+        // Variables para gestionar el filtrado en los DataGrid
         private ICollectionView? _empleadosView;
         private ICollectionView? _ubicacionesView;
+        private ICollectionView? _empleadosInactivosView;
+        private ICollectionView? _ubicacionesInactivasView;
+
         public Configuracion()
         {
             InitializeComponent();
@@ -37,10 +45,64 @@ namespace Secorvi
 
             // Vista Ubicaciones
             _ubicacionesView = CollectionViewSource.GetDefaultView(DataService.Ubicaciones);
-            _ubicacionesView.Filter = FiltroUbicaciones; 
+            _ubicacionesView.Filter = FiltroUbicaciones;
             dgUbicaciones.ItemsSource = _ubicacionesView;
+
+            ActualizarContadorUI();
+
+            // Cargar datos de la pestaña de inactivos
+            CargarTablasInactivas();
+        }
+
+        private void CargarTablasInactivas()
+        {
+            var listaEmpInactivos = DataService.ObtenerEmpleadosInactivos();
+            var listaUbiInactivas = DataService.ObtenerUbicacionesInactivas();
+
+            _empleadosInactivosView = CollectionViewSource.GetDefaultView(listaEmpInactivos);
+            _empleadosInactivosView.Filter = FiltroEmpleadosInactivos;
+            dgEmpleadosInactivos.ItemsSource = _empleadosInactivosView;
+
+            _ubicacionesInactivasView = CollectionViewSource.GetDefaultView(listaUbiInactivas);
+            _ubicacionesInactivasView.Filter = FiltroUbicacionesInactivas;
+            dgUbicacionesInactivas.ItemsSource = _ubicacionesInactivasView;
+        }
+
+        private void ActualizarContadorUI()
+        {
+            if (_empleadosView != null)
+                lblContador.Text = $"{_empleadosView.Cast<object>().Count()} AGENTES";
+
+            if (_ubicacionesView != null)
+                lblContadorUbi.Text = $"{_ubicacionesView.Cast<object>().Count()} ZONAS";
+        }
+
+        // ==========================================
+        // LÓGICA DE FILTRADO (BÚSQUEDAS)
+        // ==========================================
+
+        // Filtro Empleados Activos
+        private bool FiltroEmpleados(object obj)
+        {
+            if (obj is Empleado emp)
+            {
+                if (string.IsNullOrWhiteSpace(txtBusqueda?.Text)) return true;
+                string filtro = txtBusqueda.Text.ToLower();
+                return emp.id_empleado.ToString().Contains(filtro) ||
+                       emp.nombre_completo.ToLower().Contains(filtro) ||
+                       emp.usuario.ToLower().Contains(filtro) ||
+                       emp.telefono.Contains(filtro);
+            }
+            return false;
+        }
+
+        private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _empleadosView?.Refresh();
             ActualizarContadorUI();
         }
+
+        // Filtro Ubicaciones Activas
         private bool FiltroUbicaciones(object obj)
         {
             if (obj is Ubicacion ubi)
@@ -57,37 +119,42 @@ namespace Secorvi
             ActualizarContadorUI();
         }
 
-        // LÓGICA DE FILTRADO
-        private bool FiltroEmpleados(object obj)
+        // Filtro Empleados Inactivos
+        private bool FiltroEmpleadosInactivos(object obj)
         {
             if (obj is Empleado emp)
             {
-                // Si el cuadro de búsqueda no existe o está vacío, mostrar todos
-                if (string.IsNullOrWhiteSpace(txtBusqueda?.Text)) return true;
+                if (string.IsNullOrWhiteSpace(txtBusquedaInactivosEmp?.Text)) return true;
 
-                string filtro = txtBusqueda.Text.ToLower();
-                return emp.nombre_completo.ToLower().Contains(filtro) ||
-                       emp.usuario.ToLower().Contains(filtro) ||
-                       emp.telefono.Contains(filtro);
+                string filtro = txtBusquedaInactivosEmp.Text.ToLower();
+
+                return emp.id_empleado.ToString().Contains(filtro) ||
+                       emp.nombre_completo.ToLower().Contains(filtro);
             }
             return false;
         }
 
-        private void ActualizarContadorUI()
+        private void txtBusquedaInactivosEmp_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (_empleadosView != null)
-                lblContador.Text = $"{_empleadosView.Cast<object>().Count()} AGENTES";
+            _empleadosInactivosView?.Refresh();
+        }
 
-            // Contador para la pestaña de ubicaciones
-            if (_ubicacionesView != null)
-                lblContadorUbi.Text = $"{_ubicacionesView.Cast<object>().Count()} ZONAS";
-        }
-        // EL MÉTODO QUE SOLICITASTE
-        private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
+        // Filtro Ubicaciones Inactivas
+        private bool FiltroUbicacionesInactivas(object obj)
         {
-            _empleadosView?.Refresh();
-            ActualizarContadorUI();
+            if (obj is Ubicacion ubi)
+            {
+                if (string.IsNullOrWhiteSpace(txtBusquedaInactivosUbi?.Text)) return true;
+                return ubi.nombre_lugar.ToLower().Contains(txtBusquedaInactivosUbi.Text.ToLower());
+            }
+            return false;
         }
+
+        private void txtBusquedaInactivosUbi_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _ubicacionesInactivasView?.Refresh();
+        }
+
 
         // ==========================================
         // LÓGICA DE EMPLEADOS Y SEGURIDAD
@@ -101,8 +168,6 @@ namespace Secorvi
                 txtEmpNombre.Text = emp.nombre_completo;
                 txtEmpTelefono.Text = emp.telefono;
                 txtEmpUsuario.Text = emp.usuario;
-
-                // Cargar la contraseña actual en lugar de dejar el campo vacío
                 txtEmpPassword.Text = emp.contrasena;
 
                 if (emp.id_rol == 1) cmbEmpRol.SelectedIndex = 0;
@@ -134,6 +199,7 @@ namespace Secorvi
                 btnGuardarEmpleado.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71"));
             }
         }
+
         private void btnEliminarEmpleado_Click(object sender, RoutedEventArgs e)
         {
             if (empleadoSeleccionado == null)
@@ -142,29 +208,25 @@ namespace Secorvi
                 return;
             }
 
-            // 1. EL BLOQUEO DE SEGURIDAD VA AQUÍ (Frontend)
-            if (empleadoSeleccionado.id_empleado == 1) // Asumiendo que la propiedad se llama id_empleado
+            if (empleadoSeleccionado.id_empleado == 1)
             {
                 MessageBox.Show("PROTOCOLO DE SEGURIDAD: La cuenta del Director Principal no puede ser eliminada del sistema.", "OPERACIÓN DENEGADA", MessageBoxButton.OK, MessageBoxImage.Stop);
-                return; // Cortamos la ejecución aquí. La ventana de confirmación nunca se abre.
+                return;
             }
 
-            // 2. Si pasa el filtro, abrimos tu ventana de confirmación
             var ventanaConfirmacion = new ConfirmarEliminacion(empleadoSeleccionado.nombre_completo);
 
             if (ventanaConfirmacion.ShowDialog() == true && ventanaConfirmacion.ResultadoValidacion)
             {
                 try
                 {
-                    // 3. Ejecutar la eliminación real
-                    // DataService.EliminarEmpleado(empleadoSeleccionado.id_empleado);
-
-                    MessageBox.Show("Agente eliminado correctamente.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
-                    // CargarDatos(); // Refrescar el DataGrid
+                    DataService.EliminarEmpleado(empleadoSeleccionado.id_empleado);
+                    MessageBox.Show("Agente inactivado correctamente. Se ha movido a los registros inactivos.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
+                    CargarDatos();
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Error al eliminar: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("Error al inactivar: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -221,7 +283,6 @@ namespace Secorvi
             }
 
             DataService.ActualizarEmpleado(empleadoSeleccionado);
-
             MessageBox.Show("Datos del empleado actualizados correctamente.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
 
             txtAuthUsuario.Clear();
@@ -280,7 +341,6 @@ namespace Secorvi
                 ubicacionSeleccionada.hora_fin_default = GetTimeSpanFromPickers(cbUbiHoraFin, cbUbiAmPmFin);
 
                 DataService.ActualizarUbicacion(ubicacionSeleccionada);
-
                 MessageBox.Show("Ubicación y horario actualizados correctamente.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
                 CargarDatos();
             }
@@ -294,31 +354,100 @@ namespace Secorvi
         {
             if (ubicacionSeleccionada == null)
             {
-                MessageBox.Show("Por favor, selecciona una ubicación para eliminar.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Por favor, selecciona una ubicación para inactivar.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            var confirmacion = MessageBox.Show($"¿Estás seguro de eliminar la zona '{ubicacionSeleccionada.nombre_lugar}'?",
-                                               "CONFIRMAR ELIMINACIÓN", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            var confirmacion = MessageBox.Show($"¿Estás seguro de inactivar y ocultar la zona '{ubicacionSeleccionada.nombre_lugar}'?",
+                                               "CONFIRMAR INACTIVACIÓN", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
             if (confirmacion == MessageBoxResult.Yes)
             {
                 try
                 {
                     DataService.EliminarUbicacion(ubicacionSeleccionada.id_ubicacion);
-                    MessageBox.Show("Zona eliminada correctamente.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Zona inactivada correctamente. Se conservará en el historial pero ya no será visible.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
                     ubicacionSeleccionada = null;
                     txtUbiNombre.Clear();
                     CargarDatos();
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Error al eliminar: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("Error al inactivar: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
 
+        // ==========================================
+        // LÓGICA DE REGISTROS INACTIVOS (REACTIVACIÓN)
+        // ==========================================
+        private void dgEmpleadosInactivos_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            empleadoInactivoSeleccionado = dgEmpleadosInactivos.SelectedItem as Empleado;
+            if (empleadoInactivoSeleccionado != null)
+            {
+                btnReactivarEmpleado.IsEnabled = true;
+                btnReactivarEmpleado.Opacity = 1;
+            }
+            else
+            {
+                btnReactivarEmpleado.IsEnabled = false;
+                btnReactivarEmpleado.Opacity = 0.5;
+            }
+        }
+
+        private void dgUbicacionesInactivas_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ubicacionInactivaSeleccionada = dgUbicacionesInactivas.SelectedItem as Ubicacion;
+            if (ubicacionInactivaSeleccionada != null)
+            {
+                btnReactivarUbicacion.IsEnabled = true;
+                btnReactivarUbicacion.Opacity = 1;
+            }
+            else
+            {
+                btnReactivarUbicacion.IsEnabled = false;
+                btnReactivarUbicacion.Opacity = 0.5;
+            }
+        }
+
+        private void btnReactivarEmpleado_Click(object sender, RoutedEventArgs e)
+        {
+            if (empleadoInactivoSeleccionado != null)
+            {
+                try
+                {
+                    DataService.ReactivarEmpleado(empleadoInactivoSeleccionado.id_empleado);
+                    MessageBox.Show("El agente ha sido restaurado y ya está operativo.", "SISTEMA ACTUALIZADO", MessageBoxButton.OK, MessageBoxImage.Information);
+                    CargarDatos();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error al restaurar: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void btnReactivarUbicacion_Click(object sender, RoutedEventArgs e)
+        {
+            if (ubicacionInactivaSeleccionada != null)
+            {
+                try
+                {
+                    DataService.ReactivarUbicacion(ubicacionInactivaSeleccionada.id_ubicacion);
+                    MessageBox.Show("La zona ha sido restaurada y volverá a aparecer en el sistema.", "SISTEMA ACTUALIZADO", MessageBoxButton.OK, MessageBoxImage.Information);
+                    CargarDatos();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error al restaurar: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        // ==========================================
         // HELPERS DE TIEMPO
+        // ==========================================
         private TimeSpan GetTimeSpanFromPickers(ComboBox cbHora, ComboBox cbAmPm)
         {
             if (string.IsNullOrEmpty(cbHora.Text)) return TimeSpan.Zero;
