@@ -236,7 +236,7 @@
 
                                 <TextBlock Text="RANGO" Style="{StaticResource LblStyle}"/>
                                 <ComboBox x:Name="cmbEmpRol" SelectionChanged="cmbEmpRol_SelectionChanged">
-                                    <ComboBoxItem Content="1 - SUPER ADMIN"/>
+                                    <ComboBoxItem Content="1 - ADMINISTRADOR"/>
                                     <ComboBoxItem Content="2 - SUPERVISOR"/>
                                     <ComboBoxItem Content="3 - AGENTE"/>
                                 </ComboBox>

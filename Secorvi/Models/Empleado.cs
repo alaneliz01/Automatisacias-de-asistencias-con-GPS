@@ -10,7 +10,6 @@
         public string usuario { get; set; }
         public string contrasena { get; set; }
         public string matricula { get; set; }
-
         public string estatus_asistencia { get; set; }
         public string info_turno { get; set; }
     }
