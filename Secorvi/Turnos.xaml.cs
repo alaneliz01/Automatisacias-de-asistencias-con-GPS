@@ -229,7 +229,7 @@ namespace Secorvi
                                 NombreEmpleado = emp?.nombre_completo?.ToUpper() ?? "DESC.",
                                 Ubicacion = ubi?.nombre_lugar?.ToUpper() ?? "SIN UBICACIÓN",
                                 Turno = FormatearTurnoDiario(a),
-                                Estatus = string.IsNullOrEmpty(a.estatus) ? "PENDIENTE" : a.estatus.ToUpper()
+                                Estatus = FormatearEstatus(a)
                             });
                         }
                         Dispatcher.Invoke(() =>
@@ -286,12 +286,13 @@ namespace Secorvi
             var t = turnos.FirstOrDefault(x => x.fecha.DayOfWeek == dia);
             if (t == null) return "-";
 
-            // Sincronizando la info local con la estructura del Excel: [Fecha] \n [Turno] \n [Lugar] \n [Estatus]
             var ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == t.id_ubicacion);
             string lugar = ubi?.nombre_lugar?.ToUpper() ?? "SIN UBICACIÓN";
             string fecha = t.fecha.ToString("dd/MMM").ToUpper();
             string turno = FormatearTurnoDiario(t);
-            string estatus = FormatearEstatus(t).Replace("✅", "").Replace("⏳", "").Replace("🚪", "").Replace("❌", "").Replace("🏖️", "").Replace("💤", "").Trim();
+
+            // Llamada directa sin replaces
+            string estatus = FormatearEstatus(t);
 
             return $"{fecha}\n{turno}\n📍 {lugar}\n{estatus}";
         }
@@ -315,20 +316,51 @@ namespace Secorvi
         {
             if (t == null) return "-";
 
-            string estatusNorm = t.estatus?.Trim().ToUpper() ?? "";
+            string estatusDB = t.estatus?.Trim().ToUpper() ?? "";
             string descNorm = t.descripcion_del_turno?.Trim().ToUpper() ?? "";
 
-            if (estatusNorm == "VACACIONES" || descNorm == "VACACIONES") return "🏖️ VACACIONES";
-            if (estatusNorm == "DÍA LIBRE" || estatusNorm == "DESCANSO" || descNorm.Contains("LIBRE") || descNorm.Contains("DESC")) return "💤 DESCANSO";
+            if (estatusDB == "VACACIONES" || descNorm == "VACACIONES") return "Vacaciones";
+            if (estatusDB == "DÍA LIBRE" || estatusDB == "DESCANSO" || descNorm.Contains("LIBRE") || descNorm.Contains("DESC")) return "Descanso";
 
-            if (estatusNorm == "COMPLETADO" || estatusNorm == "ASISTENCIA" || estatusNorm == "ASISTIÓ") return "✅ ASISTENCIA";
-            if (estatusNorm == "RETRASO") return "⚠️ RETRASO";
-            if (estatusNorm == "SALIDA") return "🚪 FINALIZADO";
-            if (estatusNorm == "FALTA") return "❌ FALTA";
+            DateTime ahora = DateTime.Now;
+            DateTime inicioAsignacion = t.fecha.Date.Add(t.hora_inicio);
+            DateTime finAsignacion = t.fecha.Date.Add(t.hora_fin);
 
-            return "⏳ PENDIENTE";
+            // 1. Lógica App: Salida sin marcar (No mandó salida y ya terminó el turno)
+            if ((estatusDB == "ASISTENCIA EN CURSO" || estatusDB == "ASISTENCIA COMPLETADA") && ahora > finAsignacion)
+            {
+                return "Salida sin marcar";
+            }
+
+            // 2. Lógica App: Estados previos a la asistencia
+            if (string.IsNullOrEmpty(estatusDB) || estatusDB == "PROGRAMADA" || estatusDB == "PENDIENTE")
+            {
+                if (ahora < inicioAsignacion)
+                {
+                    return "Programada";
+                }
+                else if (ahora >= inicioAsignacion && ahora <= inicioAsignacion.AddMinutes(30)) // Margen de 30 minutos ajustable
+                {
+                    return "Pendiente de asistencia";
+                }
+                else if (ahora > inicioAsignacion.AddMinutes(30))
+                {
+                    return "No se marco asistencia";
+                }
+            }
+
+            // 3. Lógica n8n: Respetar los estados exactos que inyecta el webhook
+            if (!string.IsNullOrEmpty(t.estatus))
+            {
+                // Capitaliza solo la primera letra (ej. "Asistencia completada")
+                if (t.estatus.Length > 1)
+                    return char.ToUpper(t.estatus[0]) + t.estatus.Substring(1).ToLower();
+
+                return t.estatus;
+            }
+
+            return "Desconocido";
         }
-
         private void CbEmpleados_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();
 
         private void BtnLimpiar_Click(object sender, RoutedEventArgs e)
@@ -355,9 +387,6 @@ namespace Secorvi
 
         private void BtnVolver_Click(object sender, RoutedEventArgs e) => NavigationService?.GoBack();
 
-        // ==========================================
-        // EXPORTACIÓN A EXCEL (DISEÑO MEJORADO)
-        // ==========================================
         private void BtnExportExcel_Click(object sender, RoutedEventArgs e)
         {
             ExportacionReportes();
@@ -369,85 +398,109 @@ namespace Secorvi
             if (dpMaestro.SelectedDate == null) return;
             DateTime f = dpMaestro.SelectedDate.Value;
 
-            // Ajustamos el inicio de la semana (Ej. Nómina empezando en Viernes o Lunes)
+            // Ajustamos el inicio de la semana (Lunes a Domingo)
             int diff = (7 + (f.DayOfWeek - DayOfWeek.Monday)) % 7;
             DateTime inicioSemana = f.AddDays(-1 * diff).Date;
             DateTime finSemana = inicioSemana.AddDays(6).Date;
 
+            // 1. CARGA DE DATOS DESDE EL SERVICIO
             DataService.CargarAsignaciones();
-            DataService.CargarUbicaciones();
+            DataService.CargarAsistencias(); 
+            DataService.CargarEmpleados();
 
-            // Traemos todos los datos de la semana seleccionada
-            var datos = DataService.Asignaciones.Where(x => x.fecha >= inicioSemana && x.fecha <= finSemana).ToList();
-            if (!datos.Any()) { MessageBox.Show("No hay datos en esta semana.", "Aviso"); return; }
+            // Filtramos las asignaciones del rango de fechas
+            var asignacionesDelPeriodo = DataService.Asignaciones
+                .Where(x => x.fecha >= inicioSemana && x.fecha <= finSemana)
+                .ToList();
+
+            if (!asignacionesDelPeriodo.Any())
+            {
+                MessageBox.Show("No hay datos de asignaciones en esta semana.", "Aviso");
+                return;
+            }
 
             try
             {
-                var save = new SaveFileDialog { Filter = "Excel|*.xlsx", FileName = $"REPORTE_LISTA_{inicioSemana:yyyyMMdd}.xlsx" };
+                var save = new SaveFileDialog { Filter = "Excel|*.xlsx", FileName = $"REPORTE_SECORVI_{inicioSemana:yyyyMMdd}.xlsx" };
                 if (save.ShowDialog() == true)
                 {
                     using (var wb = new XLWorkbook())
                     {
-                        var ws = wb.Worksheets.Add("Reporte Diario");
+                        var ws = wb.Worksheets.Add("Reporte de Asistencias");
                         int filaActual = 1;
 
-                        // 1. CABECERAS (Basado en la imagen)
+                        // 1. CABECERAS (Basado en tu requerimiento de reporte plano)
                         ws.Cell(filaActual, 1).Value = "Nombre del empleado";
-                        ws.Cell(filaActual, 2).Value = "Dia";
+                        ws.Cell(filaActual, 2).Value = "Día";
                         ws.Cell(filaActual, 3).Value = "Turno";
-                        ws.Cell(filaActual, 4).Value = "Lugar";
+                        ws.Cell(filaActual, 4).Value = "Lugar (Registro GPS)";
                         ws.Cell(filaActual, 5).Value = "Estatus";
 
-                        // Estilo básico para las cabeceras
+                        // Estilo para cabeceras
                         var rangoCabeceras = ws.Range(filaActual, 1, filaActual, 5);
                         rangoCabeceras.Style.Font.Bold = true;
+                        rangoCabeceras.Style.Fill.BackgroundColor = XLColor.FromHtml("#161920");
+                        rangoCabeceras.Style.Font.FontColor = XLColor.White;
                         rangoCabeceras.SetAutoFilter();
 
-                        ws.SheetView.FreezeRows(1); // Congelar la primera fila
-
+                        ws.SheetView.FreezeRows(1);
                         filaActual++;
 
-                        // 2. PREPARAR DATOS 
-                        var listadoPlano = datos
-                            .Select(d => new
+                        // 2. PREPARAR DATOS CRUZADOS (Asignación + Empleado + Transacción de Asistencia)
+                        var listadoParaExcel = asignacionesDelPeriodo
+                            .Select(asig => new
                             {
-                                Asignacion = d,
-                                Emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == d.id_empleado),
-                                Ubi = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == d.id_ubicacion)
+                                Asignacion = asig,
+                                Emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == asig.id_empleado),
+                                // Buscamos la transacción en la tabla asistencias usando el ID de asignación
+                                Transaccion = DataService.Asistencias.FirstOrDefault(a => a.id_asignacion == asig.id_asignacion)
                             })
                             .OrderBy(x => x.Emp?.nombre_completo)
                             .ThenBy(x => x.Asignacion.fecha)
                             .ToList();
 
                         // 3. LLENADO DE LA LISTA
-                        foreach (var item in listadoPlano)
+                        foreach (var item in listadoParaExcel)
                         {
-                            ws.Cell(filaActual, 1).Value = item.Emp?.nombre_completo ?? "N/A";
+                            ws.Cell(filaActual, 1).Value = item.Emp?.nombre_completo?.ToUpper() ?? "N/A";
                             ws.Cell(filaActual, 2).Value = item.Asignacion.fecha.ToString("dd/MM/yyyy");
-                            ws.Cell(filaActual, 3).Value = FormatearTurnoDiario(item.Asignacion); 
-                            ws.Cell(filaActual, 4).Value = item.Ubi?.nombre_lugar ?? "SIN ASIGNAR";
+                            ws.Cell(filaActual, 3).Value = FormatearTurnoDiario(item.Asignacion);
+
+                            // LUGAR: Calculamos el ID de la ubicación basado en la asistencia real (si la hay) o la programada
+                            int idUbiCalculada = item.Transaccion != null && item.Transaccion.id_ubicacion != 0
+                                ? item.Transaccion.id_ubicacion
+                                : item.Asignacion.id_ubicacion;
+
+                            // Buscamos el nombre de ese lugar en la lista de ubicaciones cargadas
+                            var ubiCalculada = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == idUbiCalculada);
+
+                            ws.Cell(filaActual, 4).Value = ubiCalculada?.nombre_lugar?.ToUpper() ?? "SIN UBICACIÓN";
+
+                            // ESTATUS: Usa la lógica centralizada
                             ws.Cell(filaActual, 5).Value = FormatearEstatus(item.Asignacion);
 
-                            // Bordes simples
-                            ws.Range(filaActual, 1, filaActual, 5).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
-                            ws.Range(filaActual, 1, filaActual, 5).Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+                            // Estilo de bordes
+                            var filaRango = ws.Range(filaActual, 1, filaActual, 5);
+                            filaRango.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                            filaRango.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
 
                             filaActual++;
                         }
 
-                        // 4. AJUSTE DE TAMAÑOS
+                        // 4. AJUSTE FINAL DE FORMATO
                         ws.Columns().AdjustToContents();
-                        ws.Column(1).Width = 35; 
-                        ws.Column(4).Width = 25; 
+                        ws.Column(1).Width = 40; // Nombre
+                        ws.Column(4).Width = 35; // Lugar/GPS
+                        ws.Column(5).Width = 25; // Estatus
 
                         wb.SaveAs(save.FileName);
-                        MessageBox.Show("Reporte exportado con éxito.", "Excelente", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show("Reporte transaccional generado con éxito.", "SECORVI System", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error al exportar: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("Error crítico al generar Excel: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

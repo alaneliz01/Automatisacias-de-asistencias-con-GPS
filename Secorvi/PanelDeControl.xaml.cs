@@ -48,18 +48,82 @@ namespace Secorvi
             if (!_autoRefreshTimer.IsEnabled)
                 _autoRefreshTimer.Start();
         }
+        private string EvaluarEstadoApp(Asignacion t)
+        {
+            string estatusDB = t.estatus?.Trim().ToUpper() ?? "";
+            DateTime ahora = DateTime.Now;
+            DateTime inicioAsignacion = t.fecha.Date.Add(t.hora_inicio);
+            DateTime finAsignacion = t.fecha.Date.Add(t.hora_fin);
 
+            if ((estatusDB == "ASISTENCIA EN CURSO" || estatusDB == "ASISTENCIA COMPLETADA") && ahora > finAsignacion)
+            {
+                return "Salida sin marcar";
+            }
+
+            if (string.IsNullOrEmpty(estatusDB) || estatusDB == "PROGRAMADA" || estatusDB == "PENDIENTE")
+            {
+                if (ahora < inicioAsignacion)
+                    return "Programada";
+
+                if (ahora >= inicioAsignacion && ahora <= inicioAsignacion.AddMinutes(30))
+                    return "Pendiente de asistencia";
+
+                return "No se marco asistencia";
+            }
+
+            if (!string.IsNullOrEmpty(t.estatus))
+            {
+                if (t.estatus.Length > 1)
+                    return char.ToUpper(t.estatus[0]) + t.estatus.Substring(1).ToLower();
+
+                return t.estatus;
+            }
+
+            return "Desconocido";
+        }
         private async void CargarDatosDesdeDB()
         {
             try
             {
                 // 1. Refrescamos toda la información desde MySQL en segundo plano
-                await Task.Run(() => DataService.ActualizarTodo());
+                await Task.Run(() =>
+                {
+                    DataService.ActualizarTodo();
+                    DataService.CargarAsignaciones(); // Aseguramos tener las asignaciones listas para cruzar
+                });
 
-                // 2. Obtenemos la vista de la colección
+                // 2. NUEVA INTEGRACIÓN: Aplicar la lógica de la app a los empleados
+                DateTime hoy = DateTime.Today;
+                foreach (var emp in DataService.Empleados)
+                {
+                    var asignacionHoy = DataService.Asignaciones
+                        .FirstOrDefault(a => a.id_empleado == emp.id_empleado && a.fecha.Date == hoy);
+
+                    if (asignacionHoy != null)
+                    {
+                        emp.estatus_asistencia = EvaluarEstadoApp(asignacionHoy);
+
+                        DateTime fIni = DateTime.Today.Add(asignacionHoy.hora_inicio);
+                        DateTime fFin = DateTime.Today.Add(asignacionHoy.hora_fin);
+
+                        if (asignacionHoy.hora_inicio == TimeSpan.Zero && asignacionHoy.hora_fin == TimeSpan.Zero)
+                            emp.info_turno = "24 HORAS";
+                        else if (asignacionHoy.estatus?.Trim().ToUpper() == "DESCANSO" || asignacionHoy.estatus?.Trim().ToUpper() == "VACACIONES")
+                            emp.info_turno = asignacionHoy.estatus.ToUpper();
+                        else
+                            emp.info_turno = $"{fIni:hh:mm tt} - {fFin:hh:mm tt}";
+                    }
+                    else
+                    {
+                        emp.estatus_asistencia = "Sin asignación hoy";
+                        emp.info_turno = "-";
+                    }
+                }
+
+                // 3. Obtenemos la vista de la colección
                 _empleadosView = CollectionViewSource.GetDefaultView(DataService.Empleados);
 
-                // 3. Configuramos el filtro (mantenemos tu lógica de búsqueda)
+                // 4. Configuramos el filtro
                 _empleadosView.Filter = (obj) =>
                 {
                     if (obj is Empleado emp)
@@ -74,11 +138,11 @@ namespace Secorvi
                     return false;
                 };
 
-                // --- CAMBIO CLAVE AQUÍ ---
+                // 5. Inyectamos a la tabla
                 dgEmpleados.ItemsSource = null;
                 dgEmpleados.ItemsSource = _empleadosView;
 
-                // Refrescamos la vista de colección
+                // 6. Refrescamos la vista de colección
                 _empleadosView.Refresh();
 
                 ActualizarContadorUI();
@@ -99,7 +163,6 @@ namespace Secorvi
             }
         }
 
-        // Evento de búsqueda optimizado: solo refresca la vista existente
         private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
         {
             _empleadosView?.Refresh();

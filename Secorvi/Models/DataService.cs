@@ -26,6 +26,7 @@ namespace Secorvi
         public static List<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
         public static List<Asignacion> Asignaciones { get; set; } = new List<Asignacion>();
         public static List<Empleado> Empleados { get; set; } = new List<Empleado>();
+        public static List<Asistencia> Asistencias { get; set; } = new List<Asistencia>();
 
         public static void ActualizarTodo()
         {
@@ -43,16 +44,18 @@ namespace Secorvi
                 try
                 {
                     conn.Open();
-                    string query = @"SELECT id_empleado, estado, hora_inicio, hora_fin 
-                                     FROM asistencias 
-                                     WHERE DATE(fecha_inicio) = CURDATE() OR DATE(fecha_fin) = CURDATE()";
+                    // CAMBIO: estado por estatus en el SELECT
+                    string query = @"SELECT id_empleado, estatus, hora_inicio, hora_fin 
+                             FROM asistencias 
+                             WHERE DATE(fecha_inicio) = CURDATE() OR DATE(fecha_fin) = CURDATE()";
 
                     using (var cmd = new MySqlCommand(query, conn))
                     using (var r = cmd.ExecuteReader())
                     {
                         while (r.Read())
                         {
-                            string est = r["estado"] != DBNull.Value ? r["estado"].ToString().ToUpper() : null;
+                            // CAMBIO: Leer la columna estatus
+                            string est = r["estatus"] != DBNull.Value ? r["estatus"].ToString().ToUpper() : null;
                             TimeSpan? ent = r["hora_inicio"] != DBNull.Value ? (TimeSpan)r["hora_inicio"] : (TimeSpan?)null;
                             TimeSpan? sal = r["hora_fin"] != DBNull.Value ? (TimeSpan)r["hora_fin"] : (TimeSpan?)null;
 
@@ -72,21 +75,23 @@ namespace Secorvi
                     if (asistenciasHoy.ContainsKey(emp.id_empleado))
                     {
                         var real = asistenciasHoy[emp.id_empleado];
-                        emp.estatus_asistencia = real.estado ?? asig.estatus;
+
+                        string estadoCrudo = real.estado ?? asig.estatus;
+                        emp.estatus_asistencia = NormalizarEstatus(estadoCrudo);
 
                         string horaIn = real.entrada.HasValue ? real.entrada.Value.ToString(@"hh\:mm") : asig.hora_inicio.ToString(@"hh\:mm");
                         string horaOut = real.salida.HasValue ? real.salida.Value.ToString(@"hh\:mm") : asig.hora_fin.ToString(@"hh\:mm");
 
-                        if (real.estado == "SALIDA")
+                        if (emp.estatus_asistencia == "SALIDA")
                             emp.info_turno = $"FINALIZADO: {horaIn} - {horaOut}";
                         else
                             emp.info_turno = $"EN CURSO: {horaIn} - {horaOut}";
                     }
                     else
                     {
-                        emp.estatus_asistencia = asig.estatus;
+                        emp.estatus_asistencia = NormalizarEstatus(asig.estatus);
 
-                        if (asig.hora_inicio == TimeSpan.Zero && asig.hora_fin == TimeSpan.Zero && asig.estatus != "DESCANSO")
+                        if (asig.hora_inicio == TimeSpan.Zero && asig.hora_fin == TimeSpan.Zero && emp.estatus_asistencia != "DESCANSO")
                         {
                             emp.info_turno = $"{asig.descripcion_del_turno}: 24 HORAS";
                         }
@@ -191,6 +196,7 @@ namespace Secorvi
             CargarUbicaciones();
         }
 
+        // --- ESTE ES EL MÉTODO QUE TE FALTABA ---
         public static void CargarAsignaciones()
         {
             Asignaciones.Clear();
@@ -199,21 +205,25 @@ namespace Secorvi
                 try
                 {
                     conn.Open();
-                    string query = @"
-                SELECT 
-                    asig.id_asignacion, asig.id_empleado, asig.id_ubicacion, 
-                    asig.descripcion_del_turno, asig.fecha, asig.hora_inicio, asig.hora_fin, 
-                    COALESCE(asis.estado, asig.estatus) AS estatus_real
-                FROM secorvi_db.asignaciones asig
-                LEFT JOIN secorvi_db.asistencias asis 
-                    ON asig.id_asignacion = asis.id_asignacion
-                WHERE asig.estatus != 'INACTIVO'";
 
-                    var cmd = new MySqlCommand(query, conn);
+                    string sql = @"
+                    SELECT 
+                        asig.id_asignacion, asig.id_empleado, asig.id_ubicacion, 
+                        asig.descripcion_del_turno, asig.fecha, asig.hora_inicio, asig.hora_fin, 
+                        asig.estatus AS estatus_programado,
+                        asis.estatus AS estado_real
+                    FROM asignaciones asig
+                    LEFT JOIN asistencias asis ON asig.id_asignacion = asis.id_asignacion
+                    WHERE asig.estatus != 'INACTIVO'";
+
+                    var cmd = new MySqlCommand(sql, conn);
                     using (var r = cmd.ExecuteReader())
                     {
                         while (r.Read())
                         {
+                            string estatusProgramado = r["estatus_programado"].ToString();
+                            string estadoAsistencia = r["estado_real"] != DBNull.Value ? r["estado_real"].ToString() : null;
+
                             Asignaciones.Add(new Asignacion
                             {
                                 id_asignacion = Convert.ToInt32(r["id_asignacion"]),
@@ -223,8 +233,8 @@ namespace Secorvi
                                 fecha = Convert.ToDateTime(r["fecha"]),
                                 hora_inicio = (TimeSpan)r["hora_inicio"],
                                 hora_fin = (TimeSpan)r["hora_fin"],
-                                // Guardamos el estatus real (obtenido del JOIN)
-                                estatus = r["estatus_real"].ToString()
+
+                                estatus = !string.IsNullOrEmpty(estadoAsistencia) ? estadoAsistencia : estatusProgramado
                             });
                         }
                     }
@@ -232,7 +242,40 @@ namespace Secorvi
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Error Asignaciones: " + ex.Message); }
             }
         }
+        public static void CargarAsistencias()
+        {
+            Asistencias.Clear();
+            try
+            {
+                using (var conn = new MySql.Data.MySqlClient.MySqlConnection(connectionString))
+                {
+                    conn.Open();
+                    string query = "SELECT id_registro, id_asignacion, id_empleado, id_ubicacion, estatus, link_mapa FROM secorvi_db.asistencias";
 
+                    using (var cmd = new MySql.Data.MySqlClient.MySqlCommand(query, conn))
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            Asistencias.Add(new Asistencia
+                            {
+                                id_registro = reader["id_registro"] != DBNull.Value ? Convert.ToInt32(reader["id_registro"]) : 0,
+                                id_asignacion = reader["id_asignacion"] != DBNull.Value ? Convert.ToInt32(reader["id_asignacion"]) : 0,
+                                id_empleado = reader["id_empleado"] != DBNull.Value ? Convert.ToInt32(reader["id_empleado"]) : 0,
+                                id_ubicacion = reader["id_ubicacion"] != DBNull.Value ? Convert.ToInt32(reader["id_ubicacion"]) : 0,
+                        
+                                estatus = reader["estatus"] != DBNull.Value ? reader["estatus"].ToString() : "", 
+                                link_mapa = reader["link_mapa"] != DBNull.Value ? reader["link_mapa"].ToString() : ""
+                            });
+                        }
+                    }
+        }
+    }
+    catch (Exception ex)
+    {
+        System.Diagnostics.Debug.WriteLine($"SECORVI_LOG_ERROR: {ex.Message}");
+    }
+}
         public static void CrearAsignacion(Asignacion a)
         {
             using (var conn = new MySqlConnection(connectionString))
@@ -360,7 +403,19 @@ namespace Secorvi
             }
             return proximoId;
         }
+        private static string NormalizarEstatus(string estatusCrudo)
+        {
+            if (string.IsNullOrEmpty(estatusCrudo)) return "PROGRAMADO";
 
+            string e = estatusCrudo.Trim().ToUpper();
+
+            // Homologamos cualquier variación extraña al estándar del XAML
+            if (e == "ENTRADA" || e == "ACTIVO" || e == "COMPLETADO" || e == "ASISTIÓ") return "ASISTENCIA";
+            if (e == "DÍA LIBRE") return "DESCANSO";
+
+            // Si ya viene bien (RETRASO, FALTA, SALIDA), lo pasa directo
+            return e;
+        }
         // ==========================================
         // AGREGAR EMPLEADO CON VALIDACIÓN HÍBRIDA
         // ==========================================
@@ -716,7 +771,7 @@ namespace Secorvi
                     }
                     else if (result == System.Windows.MessageBoxResult.No)
                     {
-                        // AGREGAR NUEVO (VOLUMEN AUTOMÁTICO)
+                        // AGREGAR NUEVO
                         string nuevoNombre = ObtenerSiguienteNombreVolumen(conn, u.nombre_lugar);
                         nuevoId = InsertarNuevaUbicacion(conn, nuevoNombre, u.latitud, u.longitud, u.radio_permitido);
                     }

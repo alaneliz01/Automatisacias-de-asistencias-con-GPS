@@ -193,44 +193,49 @@
                                             <Setter Property="Background" Value="#1A1F26"/>
                                             <Setter Property="BorderBrush" Value="#2D323E"/>
                                             <Style.Triggers>
-                                                <!-- 1. ASISTENCIA (A tiempo: Verde) -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="ASISTENCIA">
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Asistencia completada">
+                                                    <Setter Property="Background" Value="#0A2D1B"/>
+                                                    <Setter Property="BorderBrush" Value="#2ECC71"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Asistencia en curso">
                                                     <Setter Property="Background" Value="#0A2D1B"/>
                                                     <Setter Property="BorderBrush" Value="#2ECC71"/>
                                                 </DataTrigger>
 
-                                                <!-- 2. RETRASO (Fuera de tolerancia: Amarillo/Naranja) -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="RETRASO">
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Pendiente de asistencia">
                                                     <Setter Property="Background" Value="#2D240A"/>
                                                     <Setter Property="BorderBrush" Value="#F1C40F"/>
                                                 </DataTrigger>
 
-                                                <!-- 3. FALTA (No llegó: Rojo) -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="FALTA">
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="No se marco asistencia">
+                                                    <Setter Property="Background" Value="#2D1214"/>
+                                                    <Setter Property="BorderBrush" Value="#FF5252"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Salida sin marcar">
                                                     <Setter Property="Background" Value="#2D1214"/>
                                                     <Setter Property="BorderBrush" Value="#FF5252"/>
                                                 </DataTrigger>
 
-                                                <!-- 4. PROGRAMADO (Futuro: Azul) -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="PROGRAMADO">
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Programada">
                                                     <Setter Property="Background" Value="#161920"/>
                                                     <Setter Property="BorderBrush" Value="#3498DB"/>
                                                 </DataTrigger>
 
-                                                <!-- 5. DESCANSO (Día libre: Gris) -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="DESCANSO">
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Descanso">
+                                                    <Setter Property="Background" Value="#1A1F26"/>
+                                                    <Setter Property="BorderBrush" Value="#6B7280"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Sin asignación hoy">
                                                     <Setter Property="Background" Value="#1A1F26"/>
                                                     <Setter Property="BorderBrush" Value="#6B7280"/>
                                                 </DataTrigger>
 
-                                                <!-- 6. VACACIONES (Azul claro/Cyan) -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="VACACIONES">
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Vacaciones">
                                                     <Setter Property="Background" Value="#0A2135"/>
                                                     <Setter Property="BorderBrush" Value="#00D4FF"/>
                                                 </DataTrigger>
 
-                                                <!-- 7. SALIDA (Turno Finalizado: Morado) -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="SALIDA">
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Salida completada">
                                                     <Setter Property="Background" Value="#1D122D"/>
                                                     <Setter Property="BorderBrush" Value="#9B59B6"/>
                                                 </DataTrigger>
