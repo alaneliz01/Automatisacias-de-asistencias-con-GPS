@@ -199,7 +199,17 @@ namespace Secorvi
                 try
                 {
                     conn.Open();
-                    var cmd = new MySqlCommand("SELECT * FROM asignaciones WHERE estatus != 'INACTIVO'", conn);
+                    string query = @"
+                SELECT 
+                    asig.id_asignacion, asig.id_empleado, asig.id_ubicacion, 
+                    asig.descripcion_del_turno, asig.fecha, asig.hora_inicio, asig.hora_fin, 
+                    COALESCE(asis.estado, asig.estatus) AS estatus_real
+                FROM secorvi_db.asignaciones asig
+                LEFT JOIN secorvi_db.asistencias asis 
+                    ON asig.id_asignacion = asis.id_asignacion
+                WHERE asig.estatus != 'INACTIVO'";
+
+                    var cmd = new MySqlCommand(query, conn);
                     using (var r = cmd.ExecuteReader())
                     {
                         while (r.Read())
@@ -213,7 +223,8 @@ namespace Secorvi
                                 fecha = Convert.ToDateTime(r["fecha"]),
                                 hora_inicio = (TimeSpan)r["hora_inicio"],
                                 hora_fin = (TimeSpan)r["hora_fin"],
-                                estatus = r["estatus"].ToString()
+                                // Guardamos el estatus real (obtenido del JOIN)
+                                estatus = r["estatus_real"].ToString()
                             });
                         }
                     }

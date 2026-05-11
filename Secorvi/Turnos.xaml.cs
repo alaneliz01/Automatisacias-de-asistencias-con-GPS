@@ -321,9 +321,10 @@ namespace Secorvi
             if (estatusNorm == "VACACIONES" || descNorm == "VACACIONES") return "🏖️ VACACIONES";
             if (estatusNorm == "DÍA LIBRE" || estatusNorm == "DESCANSO" || descNorm.Contains("LIBRE") || descNorm.Contains("DESC")) return "💤 DESCANSO";
 
-            if (estatusNorm == "COMPLETADO" || estatusNorm == "ASISTENCIA" || estatusNorm == "ASISTIÓ") return "✅ ASISTIÓ";
+            if (estatusNorm == "COMPLETADO" || estatusNorm == "ASISTENCIA" || estatusNorm == "ASISTIÓ") return "✅ ASISTENCIA";
+            if (estatusNorm == "RETRASO") return "⚠️ RETRASO";
             if (estatusNorm == "SALIDA") return "🚪 FINALIZADO";
-            if (estatusNorm == "FALTA") return "❌ FALTÓ";
+            if (estatusNorm == "FALTA") return "❌ FALTA";
 
             return "⏳ PENDIENTE";
         }
