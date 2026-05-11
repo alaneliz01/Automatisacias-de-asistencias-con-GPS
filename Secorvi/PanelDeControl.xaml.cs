@@ -72,6 +72,9 @@ namespace Secorvi
 
             if (estatusDB == "ACTIVO" || estatusDB == "ENTRADA" || estatusDB == "ASISTENCIA EN CURSO")
             {
+                if (estatusDB == "ACTIVO" && ahora < inicioAsignacion)
+                    return "Programado";
+
                 if (ahora > finAsignacion)
                     return "Salida sin marcar";
 
@@ -99,7 +102,6 @@ namespace Secorvi
 
             return "Desconocido";
         }
-
         private async void CargarDatosDesdeDB()
         {
             try
