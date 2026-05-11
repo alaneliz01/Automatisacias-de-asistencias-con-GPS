@@ -37,6 +37,41 @@
             </Setter>
         </Style>
 
+        <!-- NUEVO ESTILO PARA BOTONES DE SELECCIÓN CON EFECTO GLOW -->
+        <Style x:Key="IndustrialToggleStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="#1A1F26"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="BorderBrush" Value="#2D323E"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="2">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- Efecto Hover -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#00F5FF"/>
+                            </Trigger>
+                            <!-- Efecto Seleccionado (Iluminación) -->
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#00F5FF"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#00F5FF"/>
+                                <Setter Property="Foreground" Value="#0B0D12"/>
+                                <!-- Letra oscura para contrastar con fondo cyan -->
+                                <Setter TargetName="border" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect Color="#00F5FF" ShadowDepth="0" BlurRadius="12" Opacity="0.8"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- ESTILO DARK REFORZADO: EVITA EL FONDO BLANCO AL INICIO -->
         <Style x:Key="DarkComboBox" TargetType="ComboBox">
             <Setter Property="Background" Value="#12161D"/>
@@ -125,10 +160,12 @@
                 <Border Grid.Row="3" Background="#0F111A" BorderBrush="#2D323E" BorderThickness="1" Padding="12" Margin="0,0,0,10">
                     <StackPanel>
                         <TextBlock Text="TURNO_PRESETS" Foreground="#4B5563" FontSize="9" FontWeight="Black" Margin="0,0,0,8"/>
+
+                        <!-- BOTONES REEMPLAZADOS AQUÍ -->
                         <UniformGrid Columns="3" Height="30" Margin="0,0,0,12">
-                            <Button Content="08H" Click="BtnTurno8_Click" Style="{StaticResource IndustrialButtonStyle}" Margin="0,0,4,0"/>
-                            <Button Content="12H" Click="BtnTurno12_Click" Style="{StaticResource IndustrialButtonStyle}" Margin="0,0,4,0"/>
-                            <Button Content="24H" Click="BtnTurno24_Click" Style="{StaticResource IndustrialButtonStyle}"/>
+                            <RadioButton Content="08H" Click="BtnTurno8_Click" Style="{StaticResource IndustrialToggleStyle}" GroupName="Turnos" Margin="0,0,4,0"/>
+                            <RadioButton Content="12H" Click="BtnTurno12_Click" Style="{StaticResource IndustrialToggleStyle}" GroupName="Turnos" Margin="0,0,4,0"/>
+                            <RadioButton Content="24H" Click="BtnTurno24_Click" Style="{StaticResource IndustrialToggleStyle}" GroupName="Turnos"/>
                         </UniformGrid>
 
                         <Grid Margin="0,0,0,10">
