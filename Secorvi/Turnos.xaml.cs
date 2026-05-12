@@ -314,49 +314,58 @@ namespace Secorvi
 
         private string FormatearEstatus(Asignacion t)
         {
-            if (t == null) return "-";
-
             string estatusDB = t.estatus?.Trim().ToUpper() ?? "";
-            string descNorm = t.descripcion_del_turno?.Trim().ToUpper() ?? "";
-
-            if (estatusDB == "VACACIONES" || descNorm == "VACACIONES") return "Vacaciones";
-            if (estatusDB == "DÍA LIBRE" || estatusDB == "DESCANSO" || descNorm.Contains("LIBRE") || descNorm.Contains("DESC")) return "Descanso";
-
             DateTime ahora = DateTime.Now;
+
+            // Calcular las fechas exactas del turno
             DateTime inicioAsignacion = t.fecha.Date.Add(t.hora_inicio);
             DateTime finAsignacion = t.fecha.Date.Add(t.hora_fin);
 
-            // 1. Lógica App: Salida sin marcar (No mandó salida y ya terminó el turno)
-            if ((estatusDB == "ASISTENCIA EN CURSO" || estatusDB == "ASISTENCIA COMPLETADA") && ahora > finAsignacion)
+            // LÓGICA CRUCIAL: Si la hora fin es menor a la de inicio, el turno cruza la medianoche (termina al día siguiente)
+            if (t.hora_fin < t.hora_inicio)
             {
-                return "Salida sin marcar";
+                finAsignacion = finAsignacion.AddDays(1);
             }
 
-            // 2. Lógica App: Estados previos a la asistencia
-            if (string.IsNullOrEmpty(estatusDB) || estatusDB == "PROGRAMADA" || estatusDB == "PENDIENTE")
+            // 1. No hay registro de entrada aún (o nunca lo hubo)
+            if (string.IsNullOrEmpty(estatusDB) || estatusDB == "PROGRAMADA" || estatusDB == "PROGRAMADO" || estatusDB == "PENDIENTE")
             {
                 if (ahora < inicioAsignacion)
-                {
                     return "Programada";
-                }
-                else if (ahora >= inicioAsignacion && ahora <= inicioAsignacion.AddMinutes(30)) // Margen de 30 minutos ajustable
-                {
+
+                if (ahora >= inicioAsignacion && ahora < finAsignacion)
                     return "Pendiente de asistencia";
-                }
-                else if (ahora > inicioAsignacion.AddMinutes(30))
-                {
-                    return "No se marco asistencia";
-                }
+
+                return "No se marco asistencia"; 
             }
 
-            // 3. Lógica n8n: Respetar los estados exactos que inyecta el webhook
-            if (!string.IsNullOrEmpty(t.estatus))
+            // 2. Hay registro de entrada
+            if (estatusDB == "ACTIVO" || estatusDB == "ENTRADA" || estatusDB == "ASISTENCIA EN CURSO")
             {
-                // Capitaliza solo la primera letra (ej. "Asistencia completada")
-                if (t.estatus.Length > 1)
-                    return char.ToUpper(t.estatus[0]) + t.estatus.Substring(1).ToLower();
+                // Falso positivo: Dice activo en DB porque el turno existe, pero aún no inicia en el mundo real
+                if (estatusDB == "ACTIVO" && ahora < inicioAsignacion)
+                    return "Programada";
 
-                return t.estatus;
+                // Se les olvidó marcar salida
+                if (ahora > finAsignacion)
+                    return "Salida sin marcar";
+
+                return "Asistencia en curso";
+            }
+
+            // 3. Turno finalizado con éxito
+            if (estatusDB == "COMPLETADO" || estatusDB == "ASISTIÓ" || estatusDB == "ASISTENCIA COMPLETADA" || estatusDB == "SALIDA")
+            {
+                return "Asistencia completada";
+            }
+
+            // Retorno por defecto capitalizado (Vacaciones, Descanso, etc.)
+            if (!string.IsNullOrEmpty(estatusDB))
+            {
+                if (estatusDB.Length > 1)
+                    return char.ToUpper(estatusDB[0]) + estatusDB.Substring(1).ToLower();
+
+                return estatusDB;
             }
 
             return "Desconocido";

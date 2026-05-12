@@ -62,18 +62,18 @@ namespace Secorvi
             if (string.IsNullOrEmpty(estatusDB) || estatusDB == "PROGRAMADA" || estatusDB == "PROGRAMADO" || estatusDB == "PENDIENTE")
             {
                 if (ahora < inicioAsignacion)
-                    return "Programado";
+                    return "Programada";
 
                 if (ahora >= inicioAsignacion && ahora < finAsignacion)
-                    return "Pendiente";
+                    return "Pendiente de asistencia";
 
-                return "No se marcó asistencia";
+                return "No se marco asistencia";
             }
 
             if (estatusDB == "ACTIVO" || estatusDB == "ENTRADA" || estatusDB == "ASISTENCIA EN CURSO")
             {
                 if (estatusDB == "ACTIVO" && ahora < inicioAsignacion)
-                    return "Programado";
+                    return "Programada";
 
                 if (ahora > finAsignacion)
                     return "Salida sin marcar";
@@ -81,16 +81,17 @@ namespace Secorvi
                 return "Asistencia en curso";
             }
 
-            if (estatusDB == "COMPLETADO" || estatusDB == "ASISTIÓ" || estatusDB == "ASISTENCIA COMPLETADA" || estatusDB == "SALIDA")
+            // CÓDIGO CORREGIDO: Se restaura la validación de salida temprana
+            if (estatusDB == "COMPLETADO" || estatusDB == "ASISTIÓ" || estatusDB == "ASISTENCIA COMPLETADA" || estatusDB == "SALIDA" || estatusDB == "SALIDA TEMPRANA")
             {
-                if (ahora < finAsignacion)
+                // Si la base de datos ya dice salida temprana o si la hora actual es menor al fin del turno
+                if (estatusDB == "SALIDA TEMPRANA" || ahora < finAsignacion)
+                {
                     return "Salida temprana";
+                }
 
-                return "Asistencia completa";
+                return "Asistencia completada";
             }
-
-            if (estatusDB == "SALIDA TEMPRANA")
-                return "Salida temprana";
 
             if (!string.IsNullOrEmpty(estatusDB))
             {
@@ -203,28 +204,6 @@ namespace Secorvi
             }
         }
 
-        private void BtnEliminar_Click(object sender, RoutedEventArgs e)
-        {
-            if (dgEmpleados?.SelectedItem is Empleado emp)
-            {
-                if (SesionActual.Usuario?.id_empleado == emp.id_empleado)
-                {
-                    MessageBox.Show("ACCESO DENEGADO: No puede dar de baja su propio acceso.", "SEGURIDAD");
-                    return;
-                }
-
-                var res = MessageBox.Show($"¿CONFIRMAR BAJA LÓGICA DEL AGENTE {emp.nombre_completo}?\n\n" +
-                    "Estatus cambiará a 'Inactivo' y no podrá usar el chatbot.",
-                    "OPERACIÓN DE BAJA", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-
-                if (res == MessageBoxResult.Yes)
-                {
-                    DataService.EliminarEmpleado(emp.id_empleado);
-                    CargarDatosDesdeDB();
-                }
-            }
-        }
-
         private void BtnAsignacion_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as Button)?.DataContext is Empleado emp)
@@ -249,6 +228,11 @@ namespace Secorvi
 
         private void BtnTurnos_Click(object sender, RoutedEventArgs e)
         {
+        }
+
+        private void dgEmpleados_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+
         }
     }
 }
