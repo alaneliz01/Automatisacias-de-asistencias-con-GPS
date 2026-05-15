@@ -12,5 +12,6 @@ namespace Secorvi.Models
         public TimeSpan hora_inicio { get; set; }
         public TimeSpan hora_fin { get; set; }
         public string estatus { get; set; }
+
     }
 }

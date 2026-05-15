@@ -12,5 +12,9 @@
         public string matricula { get; set; }
         public string estatus_asistencia { get; set; }
         public string info_turno { get; set; }
+        public string info_turno_entrada { get; set; }
+        public string info_turno_salida { get; set; }
+        public string info_prog_entrada { get; set; }
+        public string info_prog_salida { get; set; }
     }
 }

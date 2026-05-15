@@ -402,22 +402,20 @@ namespace Secorvi
         }
 
         // EXPORTACIÓN A EXCEL (ESTILO MATRIZ / SECORVI)
+        // EXPORTACIÓN A EXCEL (ESTILO MATRIZ / SECORVI)
         private void ExportacionReportes()
         {
             if (dpMaestro.SelectedDate == null) return;
             DateTime f = dpMaestro.SelectedDate.Value;
 
-            // Ajustamos el inicio de la semana (Lunes a Domingo)
             int diff = (7 + (f.DayOfWeek - DayOfWeek.Monday)) % 7;
             DateTime inicioSemana = f.AddDays(-1 * diff).Date;
             DateTime finSemana = inicioSemana.AddDays(6).Date;
 
-            // 1. CARGA DE DATOS DESDE EL SERVICIO
             DataService.CargarAsignaciones();
-            DataService.CargarAsistencias(); 
+            DataService.CargarAsistencias();
             DataService.CargarEmpleados();
 
-            // Filtramos las asignaciones del rango de fechas
             var asignacionesDelPeriodo = DataService.Asignaciones
                 .Where(x => x.fecha >= inicioSemana && x.fecha <= finSemana)
                 .ToList();
@@ -438,15 +436,14 @@ namespace Secorvi
                         var ws = wb.Worksheets.Add("Reporte de Asistencias");
                         int filaActual = 1;
 
-                        // 1. CABECERAS (Basado en tu requerimiento de reporte plano)
                         ws.Cell(filaActual, 1).Value = "Nombre del empleado";
                         ws.Cell(filaActual, 2).Value = "Día";
                         ws.Cell(filaActual, 3).Value = "Turno";
                         ws.Cell(filaActual, 4).Value = "Lugar (Registro GPS)";
                         ws.Cell(filaActual, 5).Value = "Estatus";
+                        ws.Cell(filaActual, 6).Value = "Horas Trabajadas";
 
-                        // Estilo para cabeceras
-                        var rangoCabeceras = ws.Range(filaActual, 1, filaActual, 5);
+                        var rangoCabeceras = ws.Range(filaActual, 1, filaActual, 6);
                         rangoCabeceras.Style.Font.Bold = true;
                         rangoCabeceras.Style.Fill.BackgroundColor = XLColor.FromHtml("#161920");
                         rangoCabeceras.Style.Font.FontColor = XLColor.White;
@@ -455,52 +452,60 @@ namespace Secorvi
                         ws.SheetView.FreezeRows(1);
                         filaActual++;
 
-                        // 2. PREPARAR DATOS CRUZADOS (Asignación + Empleado + Transacción de Asistencia)
                         var listadoParaExcel = asignacionesDelPeriodo
                             .Select(asig => new
                             {
                                 Asignacion = asig,
                                 Emp = DataService.Empleados.FirstOrDefault(e => e.id_empleado == asig.id_empleado),
-                                // Buscamos la transacción en la tabla asistencias usando el ID de asignación
                                 Transaccion = DataService.Asistencias.FirstOrDefault(a => a.id_asignacion == asig.id_asignacion)
                             })
                             .OrderBy(x => x.Emp?.nombre_completo)
                             .ThenBy(x => x.Asignacion.fecha)
                             .ToList();
 
-                        // 3. LLENADO DE LA LISTA
                         foreach (var item in listadoParaExcel)
                         {
                             ws.Cell(filaActual, 1).Value = item.Emp?.nombre_completo?.ToUpper() ?? "N/A";
                             ws.Cell(filaActual, 2).Value = item.Asignacion.fecha.ToString("dd/MM/yyyy");
                             ws.Cell(filaActual, 3).Value = FormatearTurnoDiario(item.Asignacion);
 
-                            // LUGAR: Calculamos el ID de la ubicación basado en la asistencia real (si la hay) o la programada
                             int idUbiCalculada = item.Transaccion != null && item.Transaccion.id_ubicacion != 0
                                 ? item.Transaccion.id_ubicacion
                                 : item.Asignacion.id_ubicacion;
 
-                            // Buscamos el nombre de ese lugar en la lista de ubicaciones cargadas
                             var ubiCalculada = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == idUbiCalculada);
-
                             ws.Cell(filaActual, 4).Value = ubiCalculada?.nombre_lugar?.ToUpper() ?? "SIN UBICACIÓN";
 
-                            // ESTATUS: Usa la lógica centralizada
                             ws.Cell(filaActual, 5).Value = FormatearEstatus(item.Asignacion);
 
-                            // Estilo de bordes
-                            var filaRango = ws.Range(filaActual, 1, filaActual, 5);
+                            string horasTrabajadas = "--:--";
+                            if (item.Transaccion != null && item.Transaccion.hora_fin.HasValue)
+                            {
+                                TimeSpan inicioReal = item.Transaccion.hora_inicio;
+                                TimeSpan finReal = item.Transaccion.hora_fin.Value;
+                                TimeSpan diferencia = finReal - inicioReal;
+
+                                if (diferencia.TotalHours < 0)
+                                {
+                                    diferencia = diferencia.Add(TimeSpan.FromHours(24));
+                                }
+                                horasTrabajadas = $"{(int)diferencia.TotalHours:D2}:{diferencia.Minutes:D2}";
+                            }
+
+                            ws.Cell(filaActual, 6).Value = horasTrabajadas;
+
+                            var filaRango = ws.Range(filaActual, 1, filaActual, 6);
                             filaRango.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
                             filaRango.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
 
                             filaActual++;
                         }
 
-                        // 4. AJUSTE FINAL DE FORMATO
                         ws.Columns().AdjustToContents();
-                        ws.Column(1).Width = 40; // Nombre
-                        ws.Column(4).Width = 35; // Lugar/GPS
-                        ws.Column(5).Width = 25; // Estatus
+                        ws.Column(1).Width = 40;
+                        ws.Column(4).Width = 35;
+                        ws.Column(5).Width = 25;
+                        ws.Column(6).Width = 20;
 
                         wb.SaveAs(save.FileName);
                         MessageBox.Show("Reporte transaccional generado con éxito.", "SECORVI System", MessageBoxButton.OK, MessageBoxImage.Information);

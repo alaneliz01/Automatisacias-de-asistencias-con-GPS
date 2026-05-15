@@ -33,7 +33,6 @@ namespace Secorvi
             CargarUbicaciones();
             CargarEmpleados();
             CargarAsignaciones();
-            SincronizarEstatusVistaJefe();
         }
 
         private static void SincronizarEstatusVistaJefe()
@@ -247,12 +246,16 @@ namespace Secorvi
             Asistencias.Clear();
             try
             {
-                using (var conn = new MySql.Data.MySqlClient.MySqlConnection(connectionString))
+                using (var conn = new MySqlConnection(connectionString))
                 {
                     conn.Open();
-                    string query = "SELECT id_registro, id_asignacion, id_empleado, id_ubicacion, estatus, link_mapa FROM secorvi_db.asistencias";
+                    string query = @"SELECT id_registro, id_asignacion, id_empleado, 
+                                    id_ubicacion, estatus, link_mapa,
+                                    fecha_inicio, hora_inicio,
+                                    fecha_fin, hora_fin
+                             FROM asistencias";
 
-                    using (var cmd = new MySql.Data.MySqlClient.MySqlCommand(query, conn))
+                    using (var cmd = new MySqlCommand(query, conn))
                     using (var reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
@@ -263,19 +266,24 @@ namespace Secorvi
                                 id_asignacion = reader["id_asignacion"] != DBNull.Value ? Convert.ToInt32(reader["id_asignacion"]) : 0,
                                 id_empleado = reader["id_empleado"] != DBNull.Value ? Convert.ToInt32(reader["id_empleado"]) : 0,
                                 id_ubicacion = reader["id_ubicacion"] != DBNull.Value ? Convert.ToInt32(reader["id_ubicacion"]) : 0,
-                        
-                                estatus = reader["estatus"] != DBNull.Value ? reader["estatus"].ToString() : "", 
-                                link_mapa = reader["link_mapa"] != DBNull.Value ? reader["link_mapa"].ToString() : ""
+                                estatus = reader["estatus"] != DBNull.Value ? reader["estatus"].ToString() : "",
+                                link_mapa = reader["link_mapa"] != DBNull.Value ? reader["link_mapa"].ToString() : "",
+
+                                fecha_inicio = reader["fecha_inicio"] != DBNull.Value ? Convert.ToDateTime(reader["fecha_inicio"]) : DateTime.MinValue,
+                                hora_inicio = reader["hora_inicio"] != DBNull.Value ? (TimeSpan)reader["hora_inicio"] : TimeSpan.Zero,
+
+                                fecha_fin = reader["fecha_fin"] != DBNull.Value ? Convert.ToDateTime(reader["fecha_fin"]) : (DateTime?)null,
+                                hora_fin = reader["hora_fin"] != DBNull.Value ? (TimeSpan)reader["hora_fin"] : (TimeSpan?)null,
                             });
                         }
                     }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"SECORVI_LOG_ERROR: {ex.Message}");
+            }
         }
-    }
-    catch (Exception ex)
-    {
-        System.Diagnostics.Debug.WriteLine($"SECORVI_LOG_ERROR: {ex.Message}");
-    }
-}
         public static void CrearAsignacion(Asignacion a)
         {
             using (var conn = new MySqlConnection(connectionString))

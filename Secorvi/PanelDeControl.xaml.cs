@@ -8,7 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Threading;
-//fin de todo
+
 namespace Secorvi
 {
     public partial class PanelDeControl : Page
@@ -47,62 +47,79 @@ namespace Secorvi
                 _autoRefreshTimer.Start();
         }
 
-        private string EvaluarEstadoApp(Asignacion t)
+        private string EvaluarEstadoApp(Asignacion asignacion, Asistencia asistencia)
         {
-            string estatusDB = t.estatus?.Trim().ToUpper() ?? "";
             DateTime ahora = DateTime.Now;
-            DateTime inicioAsignacion = t.fecha.Date.Add(t.hora_inicio);
-            DateTime finAsignacion = t.fecha.Date.Add(t.hora_fin);
+            DateTime inicioProgr = asignacion.fecha.Date.Add(asignacion.hora_inicio);
+            DateTime finProgr = asignacion.fecha.Date.Add(asignacion.hora_fin);
 
-            if (t.hora_fin < t.hora_inicio)
+            // Manejo de turnos nocturnos
+            if (asignacion.hora_fin < asignacion.hora_inicio)
+                finProgr = finProgr.AddDays(1);
+
+            // ── 1. Sin registro de asistencia (asistencia es null en la DB) ──
+            if (asistencia == null)
             {
-                finAsignacion = finAsignacion.AddDays(1);
+                if (ahora < inicioProgr) return "Programada";
+                if (ahora < finProgr) return "Pendiente de asistencia";
+                return "No se marcó asistencia";
             }
 
-            if (string.IsNullOrEmpty(estatusDB) || estatusDB == "PROGRAMADA" || estatusDB == "PROGRAMADO" || estatusDB == "PENDIENTE")
+            // ── 2.
+            string estatus = asistencia.estatus?.Trim()?? "";
+
+            return estatus.ToUpper() switch
             {
-                if (ahora < inicioAsignacion)
-                    return "Programada";
-
-                if (ahora >= inicioAsignacion && ahora < finAsignacion)
-                    return "Pendiente de asistencia";
-
-                return "No se marco asistencia";
-            }
-
-            if (estatusDB == "ACTIVO" || estatusDB == "ENTRADA" || estatusDB == "ASISTENCIA EN CURSO")
-            {
-                if (estatusDB == "ACTIVO" && ahora < inicioAsignacion)
-                    return "Programada";
-
-                if (ahora > finAsignacion)
-                    return "Salida sin marcar";
-
-                return "Asistencia en curso";
-            }
-
-            // CÓDIGO CORREGIDO: Se restaura la validación de salida temprana
-            if (estatusDB == "COMPLETADO" || estatusDB == "ASISTIÓ" || estatusDB == "ASISTENCIA COMPLETADA" || estatusDB == "SALIDA" || estatusDB == "SALIDA TEMPRANA")
-            {
-                // Si la base de datos ya dice salida temprana o si la hora actual es menor al fin del turno
-                if (estatusDB == "SALIDA TEMPRANA" || ahora < finAsignacion)
-                {
-                    return "Salida temprana";
-                }
-
-                return "Asistencia completada";
-            }
-
-            if (!string.IsNullOrEmpty(estatusDB))
-            {
-                if (estatusDB.Length > 1)
-                    return char.ToUpper(estatusDB[0]) + estatusDB.Substring(1).ToLower();
-
-                return estatusDB;
-            }
-
-            return "Desconocido";
+                "ASISTENCIA EN CURSO" => !asistencia.fecha_fin.HasValue 
+                ? "Asistencia en curso, pendiente de mandar ubicacion" 
+                : "Asistencia en curso",
+                "ASISTENCIA COMPLETADA" => "Asistencia completada, pendiente de marcar salida",
+                "SALIDA COMPLETADA" => "Salida completada",
+                _                   => estatus != "" ? estatus: "Desconocido"
+            };
         }
+
+        // Función auxiliar para que el Excel se vea profesional (ej: "VACACIONES" -> "Vacaciones")
+        private string CapitalizarTexto(string texto)
+        {
+            if (string.IsNullOrEmpty(texto)) return "";
+            return char.ToUpper(texto[0]) + texto.Substring(1).ToLower();
+        }
+
+        private string FormatearEstatus(string estatus)
+        {
+            if (string.IsNullOrEmpty(estatus)) return "Desconocido";
+            return char.ToUpper(estatus[0]) + estatus.Substring(1).ToLower();
+        }
+        private (string progEntrada, string progSalida, string realEntrada, string realSalida)
+    FormatearInfoTurno(Asignacion asignacion, Asistencia asistencia)
+        {
+            string progEnt = $"Entrada: {asignacion.hora_inicio:hh\\:mm}";
+            string progSal = $"Salida:  {asignacion.hora_fin:hh\\:mm}";
+
+            if (asignacion.hora_inicio == TimeSpan.Zero && asignacion.hora_fin == TimeSpan.Zero)
+                return ("24 HORAS", "", "--:--", "--:--");
+
+            if (asignacion.estatus?.Trim().ToUpper() == "DESCANSO" ||
+                asignacion.estatus?.Trim().ToUpper() == "VACACIONES")
+                return (asignacion.estatus.ToUpper(), "", "", "");
+
+            if (asistencia == null)
+                return (progEnt, progSal, "Entrada: --:--", "Salida:  --:--");
+
+            string estatus = asistencia.estatus?.Trim().ToUpper() ?? "";
+
+            string entradaReal = $"Entrada: {asistencia.hora_inicio:hh\\:mm}";
+
+            if (estatus == "ASISTENCIA EN CURSO" || estatus == "ASISTENCIA COMPLETADA")
+                return (progEnt, progSal, entradaReal, "Salida:  --:--");
+
+            if (estatus == "SALIDA COMPLETADA" && asistencia.hora_fin.HasValue)
+                return (progEnt, progSal, entradaReal, $"Salida:  {asistencia.hora_fin.Value:hh\\:mm}");
+
+            return (progEnt, progSal, "Entrada: --:--", "Salida:  --:--");
+        }
+
         private async void CargarDatosDesdeDB()
         {
             try
@@ -111,37 +128,38 @@ namespace Secorvi
                 {
                     DataService.ActualizarTodo();
                     DataService.CargarAsignaciones();
+                    DataService.CargarAsistencias();
                 });
 
                 DateTime hoy = DateTime.Today;
                 foreach (var emp in DataService.Empleados)
                 {
                     var asignacionHoy = DataService.Asignaciones
-                        .FirstOrDefault(a => a.id_empleado == emp.id_empleado && a.fecha.Date == hoy);
+                    .FirstOrDefault(a => a.id_empleado == emp.id_empleado && a.fecha.Date == hoy)
+                    ?? DataService.Asignaciones
+                    .FirstOrDefault(a =>
+                        a.id_empleado == emp.id_empleado &&
+                        a.fecha.Date == hoy.AddDays(-1) &&
+                        a.hora_fin < a.hora_inicio);
 
                     if (asignacionHoy != null)
                     {
-                        emp.estatus_asistencia = EvaluarEstadoApp(asignacionHoy);
+                        var asistenciaHoy = DataService.Asistencias
+                            .FirstOrDefault(a => a.id_asignacion == asignacionHoy.id_asignacion
+                          && a.id_empleado == emp.id_empleado);
 
-                        DateTime fIni = DateTime.Today.Add(asignacionHoy.hora_inicio);
-                        DateTime fFin = DateTime.Today.Add(asignacionHoy.hora_fin);
-
-                        if (asignacionHoy.hora_fin < asignacionHoy.hora_inicio)
-                        {
-                            fFin = fFin.AddDays(1);
-                        }
-
-                        if (asignacionHoy.hora_inicio == TimeSpan.Zero && asignacionHoy.hora_fin == TimeSpan.Zero)
-                            emp.info_turno = "24 HORAS";
-                        else if (asignacionHoy.estatus?.Trim().ToUpper() == "DESCANSO" || asignacionHoy.estatus?.Trim().ToUpper() == "VACACIONES")
-                            emp.info_turno = asignacionHoy.estatus.ToUpper();
-                        else
-                            emp.info_turno = $"{fIni:hh:mm tt} - {fFin:hh:mm tt}";
+                        emp.estatus_asistencia = EvaluarEstadoApp(asignacionHoy, asistenciaHoy);
+                        var (progEnt, progSal, realEnt, realSal) = FormatearInfoTurno(asignacionHoy, asistenciaHoy);
+                        emp.info_prog_entrada = progEnt;
+                        emp.info_prog_salida = progSal;
+                        emp.info_turno_entrada = realEnt;
+                        emp.info_turno_salida = realSal;
                     }
                     else
                     {
                         emp.estatus_asistencia = "Sin asignación hoy";
-                        emp.info_turno = "-";
+                        emp.info_turno_entrada = "-";
+                        emp.info_turno_salida = "-";
                     }
                 }
 

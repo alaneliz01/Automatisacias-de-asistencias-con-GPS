@@ -194,30 +194,41 @@
                                             <Setter Property="BorderBrush" Value="#2D323E"/>
 
                                             <Style.Triggers>
-                                                <!-- ✅ ÉXITO: Cumplimiento total -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Asistencia completada">
-                                                    <Setter Property="Background" Value="#0A2D1B"/>
-                                                    <Setter Property="BorderBrush" Value="#2ECC71"/>
+                                                <!-- 🔵 Azul: aún no empieza -->
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Programada">
+                                                    <Setter Property="Background" Value="#161920"/>
+                                                    <Setter Property="BorderBrush" Value="#3498DB"/>
                                                 </DataTrigger>
 
-                                                <!-- ⚠️ ADVERTENCIA: Acción atípica -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Salida temprana">
-                                                    <Setter Property="Background" Value="#331A00"/>
-                                                    <Setter Property="BorderBrush" Value="#FF9800"/>
-                                                </DataTrigger>
-
-                                                <!-- ⏳ EN CURSO / PENDIENTE -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Asistencia en curso">
-                                                    <Setter Property="Background" Value="#2D240A"/>
-                                                    <Setter Property="BorderBrush" Value="#F1C40F"/>
-                                                </DataTrigger>
+                                                <!-- 🟡 Amarillo: en proceso -->
                                                 <DataTrigger Binding="{Binding estatus_asistencia}" Value="Pendiente de asistencia">
                                                     <Setter Property="Background" Value="#2D240A"/>
                                                     <Setter Property="BorderBrush" Value="#F1C40F"/>
                                                 </DataTrigger>
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Asistencia en curso">
+                                                    <Setter Property="Background" Value="#2D240A"/>
+                                                    <Setter Property="BorderBrush" Value="#F1C40F"/>
+                                                </DataTrigger>
 
-                                                <!-- 🚨 ALERTA CRÍTICA: Faltas o Infracciones -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="No se marco asistencia">
+                                                <!-- 🟣 Fondo completamente morado -->
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Asistencia en curso, pendiente de mandar ubicacion">
+                                                    <Setter Property="Background" Value="#1D122D"/>
+                                                    <Setter Property="BorderBrush" Value="#9B59B6"/>
+                                                </DataTrigger>
+
+                                                <!-- ✅ Verde más suave: asistencia completa sin salida explícita -->
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Asistencia completada, pendiente de marcar salida">
+                                                    <Setter Property="Background" Value="#1D122D"/>
+                                                    <Setter Property="BorderBrush" Value="#9B59B6"/>
+                                                </DataTrigger>
+
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Salida completada">
+                                                    <Setter Property="Background" Value="#0A2D1B"/>
+                                                    <Setter Property="BorderBrush" Value="#01C900"/>
+                                                </DataTrigger>
+
+                                                <!-- 🔴 Rojo: falló o no marcó -->
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="No se marcó asistencia">
                                                     <Setter Property="Background" Value="#2D1214"/>
                                                     <Setter Property="BorderBrush" Value="#FF5252"/>
                                                 </DataTrigger>
@@ -226,23 +237,7 @@
                                                     <Setter Property="BorderBrush" Value="#FF5252"/>
                                                 </DataTrigger>
 
-                                                <!-- ℹ️ INFORMACIÓN: Planificación -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Programada">
-                                                    <Setter Property="Background" Value="#161920"/>
-                                                    <Setter Property="BorderBrush" Value="#3498DB"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Salida completada">
-                                                    <Setter Property="Background" Value="#1D122D"/>
-                                                    <Setter Property="BorderBrush" Value="#9B59B6"/>
-                                                </DataTrigger>
-
-                                                <!-- 🌴 EVENTOS ESPECIALES -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Vacaciones">
-                                                    <Setter Property="Background" Value="#0A2135"/>
-                                                    <Setter Property="BorderBrush" Value="#00D4FF"/>
-                                                </DataTrigger>
-
-                                                <!-- ⚪ NEUTRAL: Sin acción -->
+                                                <!-- ⚫ Gris: sin actividad -->
                                                 <DataTrigger Binding="{Binding estatus_asistencia}" Value="Descanso">
                                                     <Setter Property="Background" Value="#1A1F26"/>
                                                     <Setter Property="BorderBrush" Value="#6B7280"/>
@@ -250,6 +245,12 @@
                                                 <DataTrigger Binding="{Binding estatus_asistencia}" Value="Sin asignación hoy">
                                                     <Setter Property="Background" Value="#1A1F26"/>
                                                     <Setter Property="BorderBrush" Value="#6B7280"/>
+                                                </DataTrigger>
+
+                                                <!-- 🩵 Cyan: días especiales -->
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Vacaciones">
+                                                    <Setter Property="Background" Value="#0A2135"/>
+                                                    <Setter Property="BorderBrush" Value="#00D4FF"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -272,12 +273,25 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="TURNO OPERATIVO" Width="3*">
+                    <DataGridTemplateColumn Header="TURNO PROGRAMADO" Width="160">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel VerticalAlignment="Center" Margin="10,0">
-                                    <TextBlock Text="INFO TURNO:" Foreground="#4B5563" FontSize="8" FontWeight="Black"/>
-                                    <TextBlock Text="{Binding info_turno}" Foreground="#9CA3AF" FontSize="11" FontFamily="Consolas"/>
+                                    <TextBlock Text="ASIGNADO:" Foreground="#4B5563" FontSize="8" FontWeight="Black"/>
+                                    <TextBlock Text="{Binding info_prog_entrada}" Foreground="#6B7280" FontSize="11" FontFamily="Consolas"/>
+                                    <TextBlock Text="{Binding info_prog_salida}" Foreground="#6B7280" FontSize="11" FontFamily="Consolas"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTemplateColumn Header="ASISTENCIA REAL" Width="160">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel VerticalAlignment="Center" Margin="10,0">
+                                    <TextBlock Text="MARCADO:" Foreground="#4B5563" FontSize="8" FontWeight="Black"/>
+                                    <TextBlock Text="{Binding info_turno_entrada}" Foreground="#9CA3AF" FontSize="11" FontFamily="Consolas"/>
+                                    <TextBlock Text="{Binding info_turno_salida}" Foreground="#9CA3AF" FontSize="11" FontFamily="Consolas"/>
                                 </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
