@@ -3,6 +3,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:local="clr-namespace:Secorvi"
       mc:Ignorable="d"
       Title="SECORVI - Panel de Control" 
       d:DesignHeight="720" d:DesignWidth="1060"
@@ -11,6 +12,9 @@
       UseLayoutRounding="True">
 
     <Page.Resources>
+        <local:EstatusBackgroundConverter x:Key="EstatusBackground"/>
+        <local:EstatusBorderConverter x:Key="EstatusBorder"/>
+
         <Style x:Key="TerminalInputStyle" TargetType="TextBox">
             <Setter Property="Background" Value="#161920"/>
             <Setter Property="Foreground" Value="White"/>
@@ -126,7 +130,7 @@
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
-                    <!-- COLUMNA DE ROL / ACCESO -->
+
                     <DataGridTemplateColumn Header="NIVEL ACCESO" Width="Auto" MinWidth="120">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
@@ -134,23 +138,18 @@
                                     <TextBlock x:Name="RoleText" Text="AGENTE" FontSize="9" FontWeight="Black" HorizontalAlignment="Center"/>
                                 </Border>
                                 <DataTemplate.Triggers>
-                                    <!-- Lógica para ADMINISTRADOR (ID Rol 1) -->
                                     <DataTrigger Binding="{Binding id_rol}" Value="1">
                                         <Setter TargetName="RoleBadge" Property="Background" Value="#2D1214"/>
                                         <Setter TargetName="RoleBadge" Property="BorderBrush" Value="#FF5252"/>
                                         <Setter TargetName="RoleText" Property="Text" Value="ADMINISTRADOR"/>
                                         <Setter TargetName="RoleText" Property="Foreground" Value="#FF5252"/>
                                     </DataTrigger>
-
-                                    <!-- Lógica para SUPERVISOR (ID Rol 2) -->
                                     <DataTrigger Binding="{Binding id_rol}" Value="2">
                                         <Setter TargetName="RoleBadge" Property="Background" Value="#0A2135"/>
                                         <Setter TargetName="RoleBadge" Property="BorderBrush" Value="#3498DB"/>
                                         <Setter TargetName="RoleText" Property="Text" Value="SUPERVISOR"/>
                                         <Setter TargetName="RoleText" Property="Foreground" Value="#3498DB"/>
                                     </DataTrigger>
-
-                                    <!-- Lógica para AGENTE (ID Rol 3) -->
                                     <DataTrigger Binding="{Binding id_rol}" Value="3">
                                         <Setter TargetName="RoleBadge" Property="Background" Value="#1A1F26"/>
                                         <Setter TargetName="RoleBadge" Property="BorderBrush" Value="#9CA3AF"/>
@@ -161,22 +160,25 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="AGENTE / OPERADOR" Binding="{Binding nombre_completo}" Width="2*">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="FontWeight" Value="Bold"/>
-                                <Setter Property="Foreground" Value="White"/>
-                                <Setter Property="Margin" Value="10,0"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
+
+                    <DataGridTemplateColumn Header="AGENTE / OPERADOR" Width="2*" MinWidth="150">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding nombre_completo}" 
+                                           VerticalAlignment="Center" 
+                                           FontWeight="Bold" 
+                                           Foreground="White" 
+                                           Margin="10,0"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
                     <DataGridTextColumn Header="TELÉFONO" Binding="{Binding telefono}" Width="Auto" MinWidth="120">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="VerticalAlignment" Value="Center"/>
                                 <Setter Property="Foreground" Value="#9CA3AF"/>
-                                <!-- Tono gris para no quitar protagonismo al nombre -->
                                 <Setter Property="FontFamily" Value="Consolas"/>
                                 <Setter Property="Margin" Value="10,0"/>
                             </Style>
@@ -189,84 +191,58 @@
                                 <Border CornerRadius="2" Padding="10,4" Margin="10,15" BorderThickness="1">
                                     <Border.Style>
                                         <Style TargetType="Border">
-                                            <!-- Estilo Base / Default -->
-                                            <Setter Property="Background" Value="#1A1F26"/>
-                                            <Setter Property="BorderBrush" Value="#2D323E"/>
+                                            <Setter Property="Background" Value="{Binding estatus_asistencia, Converter={StaticResource EstatusBackground}}"/>
+                                            <Setter Property="BorderBrush" Value="{Binding estatus_asistencia, Converter={StaticResource EstatusBorder}}"/>
 
                                             <Style.Triggers>
-                                                <!-- 🔵 Azul: aún no empieza -->
                                                 <DataTrigger Binding="{Binding estatus_asistencia}" Value="Programada">
-                                                    <Setter Property="Background" Value="#161920"/>
-                                                    <Setter Property="BorderBrush" Value="#3498DB"/>
-                                                </DataTrigger>
-
-                                                <!-- 🟡 Amarillo: en proceso -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Pendiente de asistencia">
-                                                    <Setter Property="Background" Value="#2D240A"/>
-                                                    <Setter Property="BorderBrush" Value="#F1C40F"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Asistencia en curso">
-                                                    <Setter Property="Background" Value="#2D240A"/>
-                                                    <Setter Property="BorderBrush" Value="#F1C40F"/>
-                                                </DataTrigger>
-
-                                                <!-- 🟣 Fondo completamente morado -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Asistencia en curso, pendiente de mandar ubicacion">
-                                                    <Setter Property="Background" Value="#1D122D"/>
-                                                    <Setter Property="BorderBrush" Value="#9B59B6"/>
-                                                </DataTrigger>
-
-                                                <!-- ✅ Verde más suave: asistencia completa sin salida explícita -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Asistencia completada, pendiente de marcar salida">
-                                                    <Setter Property="Background" Value="#1D122D"/>
-                                                    <Setter Property="BorderBrush" Value="#9B59B6"/>
-                                                </DataTrigger>
-
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Salida completada">
-                                                    <Setter Property="Background" Value="#0A2D1B"/>
-                                                    <Setter Property="BorderBrush" Value="#01C900"/>
-                                                </DataTrigger>
-
-                                                <!-- 🔴 Rojo: falló o no marcó -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="No se marcó asistencia">
-                                                    <Setter Property="Background" Value="#2D1214"/>
-                                                    <Setter Property="BorderBrush" Value="#FF5252"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Salida sin marcar">
-                                                    <Setter Property="Background" Value="#2D1214"/>
-                                                    <Setter Property="BorderBrush" Value="#FF5252"/>
-                                                </DataTrigger>
-
-                                                <!-- ⚫ Gris: sin actividad -->
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Descanso">
                                                     <Setter Property="Background" Value="#1A1F26"/>
                                                     <Setter Property="BorderBrush" Value="#6B7280"/>
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Sin asignación hoy">
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Descansos">
                                                     <Setter Property="Background" Value="#1A1F26"/>
                                                     <Setter Property="BorderBrush" Value="#6B7280"/>
                                                 </DataTrigger>
 
-                                                <!-- 🩵 Cyan: días especiales -->
                                                 <DataTrigger Binding="{Binding estatus_asistencia}" Value="Vacaciones">
                                                     <Setter Property="Background" Value="#0A2135"/>
                                                     <Setter Property="BorderBrush" Value="#00D4FF"/>
                                                 </DataTrigger>
+
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Pendiente de marcar entrada">
+                                                    <Setter Property="Background" Value="#2D240A"/>
+                                                    <Setter Property="BorderBrush" Value="#F1C40F"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Marcando entrada">
+                                                    <Setter Property="Background" Value="#2D240A"/>
+                                                    <Setter Property="BorderBrush" Value="#F1C40F"/>
+                                                </DataTrigger>
+
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Entrada registrada">
+                                                    <Setter Property="Background" Value="#0A2D1B"/>
+                                                    <Setter Property="BorderBrush" Value="#01C900"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="Asistencia completa">
+                                                    <Setter Property="Background" Value="#0A2D1B"/>
+                                                    <Setter Property="BorderBrush" Value="#01C900"/>
+                                                </DataTrigger>
+
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="No se marco la entrada">
+                                                    <Setter Property="Background" Value="#2D1214"/>
+                                                    <Setter Property="BorderBrush" Value="#FF5252"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding estatus_asistencia}" Value="No se marco la salida">
+                                                    <Setter Property="Background" Value="#2D1214"/>
+                                                    <Setter Property="BorderBrush" Value="#FF5252"/>
+                                                </DataTrigger>
+
                                             </Style.Triggers>
                                         </Style>
                                     </Border.Style>
 
-                                    <!-- Contenido del Badge -->
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <Ellipse Width="6" 
-                                             Height="6" 
-                                             Fill="{Binding BorderBrush, RelativeSource={RelativeSource AncestorType=Border}}" 
-                                             Margin="0,0,8,0"/>
-                                                        <TextBlock Text="{Binding estatus_asistencia}" 
-                                               Foreground="White" 
-                                               FontSize="10" 
-                                               FontWeight="Bold" 
-                                               VerticalAlignment="Center"/>
+                                        <Ellipse Width="6" Height="6" Fill="{Binding BorderBrush, RelativeSource={RelativeSource AncestorType=Border}}" Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding estatus_asistencia}" Foreground="White" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>

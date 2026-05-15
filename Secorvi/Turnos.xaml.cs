@@ -38,7 +38,6 @@ namespace Secorvi
             };
             this.Unloaded += (s, e) => { if (_timer != null) _timer.Stop(); };
 
-            // Buscador real que filtra la lista al escribir en el ComboBox
             cbEmpleados.KeyUp += (s, e) =>
             {
                 if (e.Key == System.Windows.Input.Key.Enter || e.Key == System.Windows.Input.Key.Down || e.Key == System.Windows.Input.Key.Up) return;
@@ -198,7 +197,8 @@ namespace Secorvi
                 {
                     DataService.CargarAsignaciones();
                     DataService.CargarEmpleados();
-                    DataService.CargarUbicaciones(); 
+                    DataService.CargarUbicaciones();
+                    DataService.CargarAsistencias(); // <-- AGREGADO: Para poder calcular la salida temprana en UI
 
                     var asignaciones = DataService.Asignaciones
                         .Where(x => x.fecha.Date >= inicio && x.fecha.Date <= fin)
@@ -229,7 +229,7 @@ namespace Secorvi
                                 NombreEmpleado = emp?.nombre_completo?.ToUpper() ?? "DESC.",
                                 Ubicacion = ubi?.nombre_lugar?.ToUpper() ?? "SIN UBICACIÓN",
                                 Turno = FormatearTurnoDiario(a),
-                                Estatus = FormatearEstatus(a)
+                                Estatus = FormatearEstatus(a) // <-- Llama a la lógica unificada
                             });
                         }
                         Dispatcher.Invoke(() =>
@@ -247,7 +247,6 @@ namespace Secorvi
             }
         }
 
-        // TABLA NORMAL (INTERFAZ DE USUARIO XAML)
         private void TablaReportes(List<Asignacion> asignaciones)
         {
             var resultadoSemana = new List<FilaVistaSemanal>();
@@ -280,7 +279,6 @@ namespace Secorvi
             });
         }
 
-        // FORMATO PARA LA UI Y LÓGICA DE ESTATUS
         private string GetTurnoTextoSemanal(List<Asignacion> turnos, DayOfWeek dia)
         {
             var t = turnos.FirstOrDefault(x => x.fecha.DayOfWeek == dia);
@@ -291,7 +289,6 @@ namespace Secorvi
             string fecha = t.fecha.ToString("dd/MMM").ToUpper();
             string turno = FormatearTurnoDiario(t);
 
-            // Llamada directa sin replaces
             string estatus = FormatearEstatus(t);
 
             return $"{fecha}\n{turno}\n📍 {lugar}\n{estatus}";
@@ -303,7 +300,7 @@ namespace Secorvi
             string descNorm = t.descripcion_del_turno?.Trim().ToUpper() ?? "";
 
             if (estatusNorm == "VACACIONES" || descNorm == "VACACIONES") return "VACACIONES";
-            if (estatusNorm == "DÍA LIBRE" || estatusNorm == "DESCANSO" || descNorm.Contains("LIBRE") || descNorm.Contains("DESC")) return "DESCANSO";
+            if (estatusNorm == "DÍA LIBRE" || estatusNorm == "DESCANSO" || estatusNorm == "DESCANSOS" || descNorm.Contains("LIBRE") || descNorm.Contains("DESC")) return "DESCANSOS";
 
             if (t.hora_inicio == TimeSpan.Zero && t.hora_fin == TimeSpan.Zero) return "24 HORAS";
 
@@ -312,64 +309,87 @@ namespace Secorvi
             return $"{fIni:hh:mm tt} - {fFin:hh:mm tt}";
         }
 
+        // =========================================================================
+        // MÉTODO CENTRALIZADO DE ESTATUS (Actualizado con nueva tabla y Salida Temprana)
+        // =========================================================================
         private string FormatearEstatus(Asignacion t)
         {
-            string estatusDB = t.estatus?.Trim().ToUpper() ?? "";
+            string estatusAsignacion = t.estatus?.Trim().ToUpper() ?? "";
+
+            if (estatusAsignacion == "VACACIONES")
+                return "Vacaciones";
+
+            if (estatusAsignacion == "DESCANSO" || estatusAsignacion == "DESCANSOS")
+                return "Descansos";
+
             DateTime ahora = DateTime.Now;
+            DateTime inicioProgr = t.fecha.Date.Add(t.hora_inicio);
+            DateTime finProgr = t.fecha.Date.Add(t.hora_fin);
 
-            // Calcular las fechas exactas del turno
-            DateTime inicioAsignacion = t.fecha.Date.Add(t.hora_inicio);
-            DateTime finAsignacion = t.fecha.Date.Add(t.hora_fin);
-
-            // LÓGICA CRUCIAL: Si la hora fin es menor a la de inicio, el turno cruza la medianoche (termina al día siguiente)
             if (t.hora_fin < t.hora_inicio)
             {
-                finAsignacion = finAsignacion.AddDays(1);
+                finProgr = finProgr.AddDays(1);
             }
 
-            // 1. No hay registro de entrada aún (o nunca lo hubo)
-            if (string.IsNullOrEmpty(estatusDB) || estatusDB == "PROGRAMADA" || estatusDB == "PROGRAMADO" || estatusDB == "PENDIENTE")
+            var asistencia = DataService.Asistencias?.FirstOrDefault(a => a.id_asignacion == t.id_asignacion && a.id_empleado == t.id_empleado);
+
+            if (asistencia == null)
             {
-                if (ahora < inicioAsignacion)
-                    return "Programada";
-
-                if (ahora >= inicioAsignacion && ahora < finAsignacion)
-                    return "Pendiente de asistencia";
-
-                return "No se marco asistencia"; 
+                if (ahora < inicioProgr) return "Programada";
+                if (ahora >= inicioProgr.AddMinutes(30)) return "No se marco la entrada";
+                if (ahora < finProgr) return "Pendiente de marcar entrada";
+                return "No se marco la entrada";
             }
 
-            // 2. Hay registro de entrada
-            if (estatusDB == "ACTIVO" || estatusDB == "ENTRADA" || estatusDB == "ASISTENCIA EN CURSO")
+            string estatusBD = asistencia.estatus?.Trim().ToUpper() ?? estatusAsignacion;
+
+            if (estatusBD != "SALIDA COMPLETADA" && estatusBD != "ASISTENCIA COMPLETADA" && estatusBD != "COMPLETADO" && estatusBD != "SALIDA" && ahora > finProgr.AddMinutes(30))
             {
-                // Falso positivo: Dice activo en DB porque el turno existe, pero aún no inicia en el mundo real
-                if (estatusDB == "ACTIVO" && ahora < inicioAsignacion)
-                    return "Programada";
-
-                // Se les olvidó marcar salida
-                if (ahora > finAsignacion)
-                    return "Salida sin marcar";
-
-                return "Asistencia en curso";
+                return "No se marco la salida";
             }
 
-            // 3. Turno finalizado con éxito
-            if (estatusDB == "COMPLETADO" || estatusDB == "ASISTIÓ" || estatusDB == "ASISTENCIA COMPLETADA" || estatusDB == "SALIDA")
+            if (estatusBD == "ASISTENCIA EN CURSO" || estatusBD == "ACTIVO" || estatusBD == "ENTRADA")
             {
-                return "Asistencia completada";
+                return !asistencia.fecha_fin.HasValue
+                    ? "Marcando entrada"
+                    : "Entrada registrada";
             }
 
-            // Retorno por defecto capitalizado (Vacaciones, Descanso, etc.)
-            if (!string.IsNullOrEmpty(estatusDB))
+            if (estatusBD == "ASISTENCIA COMPLETADA" || estatusBD == "COMPLETADO" || estatusBD == "SALIDA COMPLETADA" || estatusBD == "SALIDA" || estatusBD == "ASISTIÓ")
             {
-                if (estatusDB.Length > 1)
-                    return char.ToUpper(estatusDB[0]) + estatusDB.Substring(1).ToLower();
+                if (!asistencia.hora_fin.HasValue)
+                    return "Asistencia completa";
 
-                return estatusDB;
+                DateTime salidaReal = asistencia.fecha_fin.HasValue
+                    ? asistencia.fecha_fin.Value.Date.Add(asistencia.hora_fin.Value)
+                    : DateTime.MinValue;
+
+                if (salidaReal < finProgr)
+                {
+                    TimeSpan diferencia = finProgr - salidaReal;
+                    int horas = diferencia.Hours;
+                    int minutos = diferencia.Minutes;
+
+                    string tiempoFormateado = horas > 0
+                        ? (minutos > 0 ? $"{horas} h {minutos} min" : $"{horas} h")
+                        : $"{minutos} min";
+
+                    return $"Salida temprana ({tiempoFormateado} antes)";
+                }
+
+                return "Asistencia completa";
+            }
+
+            if (!string.IsNullOrEmpty(estatusBD))
+            {
+                return estatusBD.Length > 1
+                    ? char.ToUpper(estatusBD[0]) + estatusBD.Substring(1).ToLower()
+                    : estatusBD;
             }
 
             return "Desconocido";
         }
+
         private void CbEmpleados_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();
 
         private void BtnLimpiar_Click(object sender, RoutedEventArgs e)
@@ -401,8 +421,6 @@ namespace Secorvi
             ExportacionReportes();
         }
 
-        // EXPORTACIÓN A EXCEL (ESTILO MATRIZ / SECORVI)
-        // EXPORTACIÓN A EXCEL (ESTILO MATRIZ / SECORVI)
         private void ExportacionReportes()
         {
             if (dpMaestro.SelectedDate == null) return;
@@ -476,8 +494,13 @@ namespace Secorvi
                             var ubiCalculada = DataService.Ubicaciones.FirstOrDefault(u => u.id_ubicacion == idUbiCalculada);
                             ws.Cell(filaActual, 4).Value = ubiCalculada?.nombre_lugar?.ToUpper() ?? "SIN UBICACIÓN";
 
-                            ws.Cell(filaActual, 5).Value = FormatearEstatus(item.Asignacion);
+                            // =========================================================
+                            // GRACIAS AL CAMBIO, YA NO NECESITAMOS RECALCULAR NADA AQUÍ
+                            // =========================================================
+                            string estatusExport = FormatearEstatus(item.Asignacion);
+                            ws.Cell(filaActual, 5).Value = estatusExport;
 
+                            // CÁLCULO DE HORAS TRABAJADAS
                             string horasTrabajadas = "--:--";
                             if (item.Transaccion != null && item.Transaccion.hora_fin.HasValue)
                             {
@@ -504,7 +527,7 @@ namespace Secorvi
                         ws.Columns().AdjustToContents();
                         ws.Column(1).Width = 40;
                         ws.Column(4).Width = 35;
-                        ws.Column(5).Width = 25;
+                        ws.Column(5).Width = 30;
                         ws.Column(6).Width = 20;
 
                         wb.SaveAs(save.FileName);
@@ -518,7 +541,6 @@ namespace Secorvi
             }
         }
 
-        // NAVEGADOR INTELIGENTE (FILTRO EN VIVO)
         private void TxtBusqueda_TextChanged(object sender, TextChangedEventArgs e)
         {
             _vistaSemanal?.Refresh();
@@ -541,9 +563,6 @@ namespace Secorvi
             return fila != null && fila.NombreEmpleado.Contains(TxtBusqueda.Text.ToUpper());
         }
 
-        // ==========================================
-        // CLASES DE MODELO PARA LA VISTA
-        // ==========================================
         public class EmpleadoCombo
         {
             public int id_empleado { get; set; }

@@ -2,11 +2,13 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace Secorvi
@@ -49,50 +51,85 @@ namespace Secorvi
 
         private string EvaluarEstadoApp(Asignacion asignacion, Asistencia asistencia)
         {
+            // Validar primero si es un día de descanso o vacaciones
+            string estatusAsignacion = asignacion.estatus?.Trim().ToUpper() ?? "";
+
+            if (estatusAsignacion == "VACACIONES")
+                return "Vacaciones";
+
+            if (estatusAsignacion == "DESCANSO" || estatusAsignacion == "DESCANSOS")
+                return "Descansos";
+
             DateTime ahora = DateTime.Now;
             DateTime inicioProgr = asignacion.fecha.Date.Add(asignacion.hora_inicio);
             DateTime finProgr = asignacion.fecha.Date.Add(asignacion.hora_fin);
 
-            // Manejo de turnos nocturnos
             if (asignacion.hora_fin < asignacion.hora_inicio)
                 finProgr = finProgr.AddDays(1);
 
-            // ── 1. Sin registro de asistencia (asistencia es null en la DB) ──
             if (asistencia == null)
             {
                 if (ahora < inicioProgr) return "Programada";
-                if (ahora < finProgr) return "Pendiente de asistencia";
-                return "No se marcó asistencia";
+
+                // Si ya pasaron 30 minutos o más de la hora de inicio (Límite para tomar asistencia)
+                if (ahora >= inicioProgr.AddMinutes(30)) return "No se marco la entrada";
+
+                if (ahora < finProgr) return "Pendiente de marcar entrada";
+
+                return "No se marco la entrada";
             }
 
-            // ── 2.
-            string estatus = asistencia.estatus?.Trim()?? "";
+            string estatus = asistencia.estatus?.Trim().ToUpper() ?? "";
 
-            return estatus.ToUpper() switch
+            // Validación para "No se marcó la salida" (Pasó la hora límite del turno y no completó)
+            // Usamos 30 min de tolerancia, ajusta el AddMinutes según tu regla de negocio
+            if (estatus != "SALIDA COMPLETADA" && ahora > finProgr.AddMinutes(30))
             {
-                "ASISTENCIA EN CURSO" => !asistencia.fecha_fin.HasValue 
-                ? "Asistencia en curso, pendiente de mandar ubicacion" 
-                : "Asistencia en curso",
-                "ASISTENCIA COMPLETADA" => "Asistencia completada, pendiente de marcar salida",
-                "SALIDA COMPLETADA" => "Salida completada",
-                _                   => estatus != "" ? estatus: "Desconocido"
+                return "No se marco la salida";
+            }
+
+            return estatus switch
+            {
+                "ASISTENCIA EN CURSO" => !asistencia.fecha_fin.HasValue
+                    ? "Marcando entrada"    // Solo mandó número, falta ubicación
+                    : "Entrada registrada", // Mandó número y ubicación
+
+                "ASISTENCIA COMPLETADA" => "Entrada registrada",
+
+                "SALIDA COMPLETADA" => EvaluarSalidaCompletada(asistencia, finProgr),
+
+                _ => estatus != "" ? estatus : "Desconocido"
             };
         }
 
-        // Función auxiliar para que el Excel se vea profesional (ej: "VACACIONES" -> "Vacaciones")
-        private string CapitalizarTexto(string texto)
+        private string EvaluarSalidaCompletada(Asistencia asistencia, DateTime finProgr)
         {
-            if (string.IsNullOrEmpty(texto)) return "";
-            return char.ToUpper(texto[0]) + texto.Substring(1).ToLower();
+            if (!asistencia.hora_fin.HasValue)
+                return "Asistencia completa";
+
+            DateTime salidaReal = asistencia.fecha_fin.HasValue
+                ? asistencia.fecha_fin.Value.Date.Add(asistencia.hora_fin.Value)
+                : DateTime.MinValue;
+
+            if (salidaReal < finProgr)
+            {
+                TimeSpan diferencia = finProgr - salidaReal;
+                int horas = diferencia.Hours;
+                int minutos = diferencia.Minutes;
+
+                string tiempoFormateado = horas > 0
+                    ? (minutos > 0 ? $"{horas} h {minutos} min" : $"{horas} h")
+                    : $"{minutos} min";
+
+                // Se mantiene el mensaje de salida temprana con el tiempo exacto
+                return $"Salida temprana ({tiempoFormateado} antes)";
+            }
+
+            // Si salió a la hora o después, muestra el mensaje de la tabla
+            return "Asistencia completa";
         }
 
-        private string FormatearEstatus(string estatus)
-        {
-            if (string.IsNullOrEmpty(estatus)) return "Desconocido";
-            return char.ToUpper(estatus[0]) + estatus.Substring(1).ToLower();
-        }
-        private (string progEntrada, string progSalida, string realEntrada, string realSalida)
-    FormatearInfoTurno(Asignacion asignacion, Asistencia asistencia)
+        private (string progEntrada, string progSalida, string realEntrada, string realSalida) FormatearInfoTurno(Asignacion asignacion, Asistencia asistencia)
         {
             string progEnt = $"Entrada: {asignacion.hora_inicio:hh\\:mm}";
             string progSal = $"Salida:  {asignacion.hora_fin:hh\\:mm}";
@@ -101,14 +138,18 @@ namespace Secorvi
                 return ("24 HORAS", "", "--:--", "--:--");
 
             if (asignacion.estatus?.Trim().ToUpper() == "DESCANSO" ||
+                asignacion.estatus?.Trim().ToUpper() == "DESCANSOS" ||
                 asignacion.estatus?.Trim().ToUpper() == "VACACIONES")
-                return (asignacion.estatus.ToUpper(), "", "", "");
+            {
+                // Capitalizamos la primera letra para presentación
+                string estatusFormateado = char.ToUpper(asignacion.estatus[0]) + asignacion.estatus.Substring(1).ToLower();
+                return (estatusFormateado, "", "", "");
+            }
 
             if (asistencia == null)
                 return (progEnt, progSal, "Entrada: --:--", "Salida:  --:--");
 
             string estatus = asistencia.estatus?.Trim().ToUpper() ?? "";
-
             string entradaReal = $"Entrada: {asistencia.hora_inicio:hh\\:mm}";
 
             if (estatus == "ASISTENCIA EN CURSO" || estatus == "ASISTENCIA COMPLETADA")
@@ -119,7 +160,6 @@ namespace Secorvi
 
             return (progEnt, progSal, "Entrada: --:--", "Salida:  --:--");
         }
-
         private async void CargarDatosDesdeDB()
         {
             try
@@ -250,7 +290,69 @@ namespace Secorvi
 
         private void dgEmpleados_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+        }
+    }
 
+    // ---------------------------------------------------------------------
+    // CONVERTERS MODIFICADOS
+    // ---------------------------------------------------------------------
+    public class EstatusBackgroundConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string estatus = value as string;
+            var converter = new BrushConverter();
+
+            if (!string.IsNullOrEmpty(estatus))
+            {
+                if (estatus.StartsWith("Salida temprana"))
+                {
+                    return (Brush)converter.ConvertFromString("#2D240A");
+                }
+
+                if (estatus == "No se marco asistencia")
+                {
+                    // Fondo rojo oscuro
+                    return (Brush)converter.ConvertFromString("#3E1414");
+                }
+            }
+
+            return (Brush)converter.ConvertFromString("#1A1F26");
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class EstatusBorderConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string estatus = value as string;
+            var converter = new BrushConverter();
+
+            if (!string.IsNullOrEmpty(estatus))
+            {
+                if (estatus.StartsWith("Salida temprana"))
+                {
+                    return (Brush)converter.ConvertFromString("#F1C40F");
+                }
+
+                if (estatus == "No se marco asistencia")
+                {
+                    // Borde rojo brillante
+                    return (Brush)converter.ConvertFromString("#E74C3C");
+                }
+            }
+
+            return (Brush)converter.ConvertFromString("#2D323E");
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
         }
     }
 }
