@@ -12,14 +12,21 @@
 
         <Style TargetType="{x:Type ScrollBar}">
             <Setter Property="Width" Value="8"/>
+            <Setter Property="Height" Value="8"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ScrollBar}">
                         <Grid x:Name="Bg" Background="Transparent">
-                            <Track x:Name="PART_Track" IsDirectionReversed="true" Orientation="Vertical">
+                            <Track x:Name="PART_Track" IsDirectionReversed="true">
                                 <Track.Thumb>
-                                    <Thumb Background="#2D323E"/>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Background="#2D323E" CornerRadius="4" Margin="1"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
                                 </Track.Thumb>
                             </Track>
                         </Grid>
@@ -32,21 +39,28 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#9CA3AF"/>
             <Setter Property="Height" Value="45"/>
+            <Setter Property="Margin" Value="0,2"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Padding" Value="15,0"/>
             <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="brd" Background="{TemplateBinding Background}" BorderThickness="4,0,0,0" BorderBrush="Transparent">
+                        <Border x:Name="brd" Background="{TemplateBinding Background}" BorderThickness="3,0,0,0" BorderBrush="Transparent">
                             <ContentPresenter VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#1A1F26"/>
+                                <Setter Property="Background" Value="{StaticResource SecorviPanel}"/>
                                 <Setter Property="Foreground" Value="White"/>
-                                <Setter Property="BorderBrush" Value="#FFB300"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource SecorviYellow}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{StaticResource SecorviBorder}"/>
+                                <Setter Property="BorderBrush" Value="#00F5FF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

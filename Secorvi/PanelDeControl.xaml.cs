@@ -114,18 +114,20 @@ namespace Secorvi
             if (salidaReal < finProgr)
             {
                 TimeSpan diferencia = finProgr - salidaReal;
+
+                if (diferencia.TotalMinutes <= 15)
+                {
+                    return "Asistencia completa";
+                }
+
                 int horas = diferencia.Hours;
                 int minutos = diferencia.Minutes;
 
                 string tiempoFormateado = horas > 0
                     ? (minutos > 0 ? $"{horas} h {minutos} min" : $"{horas} h")
                     : $"{minutos} min";
-
-                // Se mantiene el mensaje de salida temprana con el tiempo exacto
                 return $"Salida temprana ({tiempoFormateado} antes)";
             }
-
-            // Si salió a la hora o después, muestra el mensaje de la tabla
             return "Asistencia completa";
         }
 

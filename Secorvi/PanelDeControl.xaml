@@ -53,7 +53,7 @@
         </Style>
 
         <Style x:Key="ActionGridButton" TargetType="Button" BasedOn="{StaticResource IndustrialButtonStyle}">
-            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="FontSize" Value="10"/>
             <Setter Property="Padding" Value="8,4"/>
             <Setter Property="Height" Value="28"/>
         </Style>
@@ -64,7 +64,7 @@
             <Setter Property="BorderBrush" Value="#2D323E"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
             <Setter Property="Padding" Value="12,10"/>
-            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="Black"/>
         </Style>
 
@@ -80,7 +80,7 @@
         </Style>
     </Page.Resources>
 
-    <Grid Margin="20">
+    <Grid Margin="12,10,12,10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -105,37 +105,38 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="🔍 FILTRAR TERMINAL:" Foreground="#4B5563" FontWeight="Bold" VerticalAlignment="Center" FontSize="10" Margin="0,0,15,0"/>
-                <TextBox x:Name="txtBusqueda" Grid.Column="1" Height="30" Style="{StaticResource TerminalInputStyle}" TextChanged="TxtBusqueda_TextChanged" BorderThickness="0,0,0,1" Background="Transparent"/>
-                <TextBlock Grid.Column="2" x:Name="lblTotal" Text="AGENTES: 0" Foreground="#FFB300" VerticalAlignment="Center" Margin="15,0,0,0" FontSize="10" FontWeight="Black"/>
+                <TextBlock Text="🔍 FILTRAR TERMINAL:" Foreground="#4B5563" FontWeight="Bold" VerticalAlignment="Center" FontSize="11" Margin="0,0,15,0"/>
+                <TextBox x:Name="txtBusqueda" Grid.Column="1" Height="30" Style="{StaticResource TerminalInputStyle}" TextChanged="TxtBusqueda_TextChanged" BorderThickness="0,0,0,1" Background="Transparent" FontSize="12"/>
+                <TextBlock Grid.Column="2" x:Name="lblTotal" Text="AGENTES: 0" Foreground="#FFB300" VerticalAlignment="Center" Margin="15,0,0,0" FontSize="11" FontWeight="Black"/>
             </Grid>
         </Border>
 
         <Border Grid.Row="2" Background="#0F111A" BorderBrush="#2D323E" BorderThickness="1,0,1,1">
             <DataGrid x:Name="dgEmpleados" AutoGenerateColumns="False" CanUserAddRows="False" 
-                      Background="Transparent" RowHeight="60" HeadersVisibility="Column" 
+                      Background="Transparent" RowHeight="55" HeadersVisibility="Column" 
                       IsReadOnly="True" GridLinesVisibility="None" BorderThickness="0"
                       MouseDoubleClick="DgEmpleados_MouseDoubleClick"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto" SelectionChanged="dgEmpleados_SelectionChanged">
                 <DataGrid.Columns>
 
-                    <DataGridTextColumn Header="ID" Binding="{Binding id_empleado}" Width="Auto" MinWidth="60">
+                    <DataGridTextColumn Header="ID" Binding="{Binding id_empleado}" Width="50">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="Foreground" Value="#FFB300"/>
                                 <Setter Property="VerticalAlignment" Value="Center"/>
                                 <Setter Property="HorizontalAlignment" Value="Center"/>
                                 <Setter Property="FontWeight" Value="Black"/>
+                                <Setter Property="FontSize" Value="12"/>
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
 
-                    <DataGridTemplateColumn Header="NIVEL ACCESO" Width="Auto" MinWidth="120">
+                    <DataGridTemplateColumn Header="NIVEL ACCESO" Width="115">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Border x:Name="RoleBadge" CornerRadius="2" Padding="8,2" Margin="5,0" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                    <TextBlock x:Name="RoleText" Text="AGENTE" FontSize="9" FontWeight="Black" HorizontalAlignment="Center"/>
+                                <Border x:Name="RoleBadge" CornerRadius="2" Padding="8,4" Margin="5,0" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                    <TextBlock x:Name="RoleText" Text="AGENTE" FontSize="10" FontWeight="Black" HorizontalAlignment="Center"/>
                                 </Border>
                                 <DataTemplate.Triggers>
                                     <DataTrigger Binding="{Binding id_rol}" Value="1">
@@ -161,34 +162,36 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="AGENTE / OPERADOR" Width="2*" MinWidth="150">
+                    <DataGridTemplateColumn Header="AGENTE / OPERADOR" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding nombre_completo}" 
                                            VerticalAlignment="Center" 
                                            FontWeight="Bold" 
                                            Foreground="White" 
+                                           FontSize="13"
                                            Margin="10,0"
                                            TextTrimming="CharacterEllipsis"/>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTextColumn Header="TELÉFONO" Binding="{Binding telefono}" Width="Auto" MinWidth="120">
+                    <DataGridTextColumn Header="TELÉFONO" Binding="{Binding telefono}" Width="105">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="VerticalAlignment" Value="Center"/>
                                 <Setter Property="Foreground" Value="#9CA3AF"/>
                                 <Setter Property="FontFamily" Value="Consolas"/>
+                                <Setter Property="FontSize" Value="12"/>
                                 <Setter Property="Margin" Value="10,0"/>
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
 
-                    <DataGridTemplateColumn Header="ESTATUS ASISTENCIA" Width="Auto" MinWidth="180">
+                    <DataGridTemplateColumn Header="ESTATUS ASISTENCIA" Width="195">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Border CornerRadius="2" Padding="10,4" Margin="10,15" BorderThickness="1">
+                                <Border CornerRadius="2" Padding="8,4" Margin="5,8" BorderThickness="1">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Setter Property="Background" Value="{Binding estatus_asistencia, Converter={StaticResource EstatusBackground}}"/>
@@ -203,12 +206,10 @@
                                                     <Setter Property="Background" Value="#1A1F26"/>
                                                     <Setter Property="BorderBrush" Value="#6B7280"/>
                                                 </DataTrigger>
-
                                                 <DataTrigger Binding="{Binding estatus_asistencia}" Value="Vacaciones">
                                                     <Setter Property="Background" Value="#0A2135"/>
                                                     <Setter Property="BorderBrush" Value="#00D4FF"/>
                                                 </DataTrigger>
-
                                                 <DataTrigger Binding="{Binding estatus_asistencia}" Value="Pendiente de marcar entrada">
                                                     <Setter Property="Background" Value="#2D240A"/>
                                                     <Setter Property="BorderBrush" Value="#F1C40F"/>
@@ -217,7 +218,6 @@
                                                     <Setter Property="Background" Value="#2D240A"/>
                                                     <Setter Property="BorderBrush" Value="#F1C40F"/>
                                                 </DataTrigger>
-
                                                 <DataTrigger Binding="{Binding estatus_asistencia}" Value="Entrada registrada">
                                                     <Setter Property="Background" Value="#0A2D1B"/>
                                                     <Setter Property="BorderBrush" Value="#01C900"/>
@@ -226,34 +226,32 @@
                                                     <Setter Property="Background" Value="#0A2D1B"/>
                                                     <Setter Property="BorderBrush" Value="#01C900"/>
                                                 </DataTrigger>
-
                                                 <DataTrigger Binding="{Binding estatus_asistencia}" Value="No se marco la entrada">
-                                                    <Setter Property="Background" Value="#2D1214"/>
+                                                    <Setter Property="Background" Value="#3E1414"/>
                                                     <Setter Property="BorderBrush" Value="#FF5252"/>
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding estatus_asistencia}" Value="No se marco la salida">
-                                                    <Setter Property="Background" Value="#2D1214"/>
+                                                    <Setter Property="Background" Value="#3E1414"/>
                                                     <Setter Property="BorderBrush" Value="#FF5252"/>
                                                 </DataTrigger>
-
                                             </Style.Triggers>
                                         </Style>
                                     </Border.Style>
 
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <Ellipse Width="6" Height="6" Fill="{Binding BorderBrush, RelativeSource={RelativeSource AncestorType=Border}}" Margin="0,0,8,0"/>
-                                        <TextBlock Text="{Binding estatus_asistencia}" Foreground="White" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        <Ellipse Width="6" Height="6" Fill="{Binding BorderBrush, RelativeSource={RelativeSource AncestorType=Border}}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding estatus_asistencia}" Foreground="White" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="TURNO PROGRAMADO" Width="160">
+                    <DataGridTemplateColumn Header="TURNO PROGRAMADO" Width="135">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <StackPanel VerticalAlignment="Center" Margin="10,0">
-                                    <TextBlock Text="ASIGNADO:" Foreground="#4B5563" FontSize="8" FontWeight="Black"/>
+                                <StackPanel VerticalAlignment="Center" Margin="5,0">
+                                    <TextBlock Text="ASIGNADO:" Foreground="#4B5563" FontSize="9" FontWeight="Black"/>
                                     <TextBlock Text="{Binding info_prog_entrada}" Foreground="#6B7280" FontSize="11" FontFamily="Consolas"/>
                                     <TextBlock Text="{Binding info_prog_salida}" Foreground="#6B7280" FontSize="11" FontFamily="Consolas"/>
                                 </StackPanel>
@@ -261,11 +259,11 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="ASISTENCIA REAL" Width="160">
+                    <DataGridTemplateColumn Header="ASISTENCIA REAL" Width="135">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <StackPanel VerticalAlignment="Center" Margin="10,0">
-                                    <TextBlock Text="MARCADO:" Foreground="#4B5563" FontSize="8" FontWeight="Black"/>
+                                <StackPanel VerticalAlignment="Center" Margin="5,0">
+                                    <TextBlock Text="MARCADO:" Foreground="#4B5563" FontSize="9" FontWeight="Black"/>
                                     <TextBlock Text="{Binding info_turno_entrada}" Foreground="#9CA3AF" FontSize="11" FontFamily="Consolas"/>
                                     <TextBlock Text="{Binding info_turno_salida}" Foreground="#9CA3AF" FontSize="11" FontFamily="Consolas"/>
                                 </StackPanel>
@@ -273,12 +271,12 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="GESTIÓN" Width="Auto" MinWidth="200">
+                    <DataGridTemplateColumn Header="GESTIÓN" Width="165">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <Button Content="CALENDARIO" Click="BtnCalendario_Click" Style="{StaticResource ActionGridButton}" Width="90" Margin="0,0,5,0"/>
-                                    <Button Content="ASIGNAR" Click="BtnAsignacion_Click" Style="{StaticResource ActionGridButton}" Width="80" BorderBrush="#2ECC71" Foreground="#2ECC71"/>
+                                    <Button Content="CALENDARIO" Click="BtnCalendario_Click" Style="{StaticResource ActionGridButton}" Width="80" Margin="0,0,8,0"/>
+                                    <Button Content="ASIGNAR" Click="BtnAsignacion_Click" Style="{StaticResource ActionGridButton}" Width="70" BorderBrush="#2ECC71" Foreground="#2ECC71"/>
                                 </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
@@ -292,9 +290,9 @@
             <DockPanel>
                 <StackPanel Orientation="Horizontal">
                     <Ellipse Width="8" Height="8" Fill="#2ECC71" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <TextBlock Text="CONEXIÓN ESTABLE - BASE DE DATOS ACTIVA" Foreground="#4B5563" FontSize="9" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <TextBlock Text="CONEXIÓN ESTABLE - BASE DE DATOS ACTIVA" Foreground="#4B5563" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
                 </StackPanel>
-                <TextBlock Text="SECORVI v2.5.0" Foreground="#2D323E" FontSize="9" FontWeight="Black" HorizontalAlignment="Right"/>
+                <TextBlock Text="SECORVI v2.5.0" Foreground="#2D323E" FontSize="10" FontWeight="Black" HorizontalAlignment="Right"/>
             </DockPanel>
         </Border>
     </Grid>
